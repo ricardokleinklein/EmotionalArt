@@ -69,33 +69,18 @@ class SentencesDataset(Dataset):
                           shuffle=False, num_workers=num_workers)
 
 
-class VideoByFrameDataset(Dataset):
+class OneImageToManySentences(Dataset):
 
-    valid_formats = {'jpg', 'jpeg', 'png', 'bmp'}
-    default_preprocessor = transformers.CLIPFeatureExtractor()
+    def __init__(self, reference: pandas.DataFrame, key: str) -> None:
+        """
 
-    def __init__(self, videoframes_path, scores, preprocessor = None):
-        self.paths = videoframes_path
-        self.targets = scores
-        self.preprocessor = self.default_preprocessor if \
-            preprocessor is None else preprocessor
+        Args:
+            reference:
+            key:
+        """
+        self.df = reference
+        self.key = key
 
-    def __len__(self):
-        return len(self.targets)
+    def __len__(self) -> int:
+        return len(self.df[self.key].unique())
 
-    def __getitem__(self, idx):
-        video_path = self.paths[idx]
-        frame_paths = sorted([f for f in glob.glob(video_path + '*') if \
-                              f.split('.')[-1] in self.valid_formats])
-        target = torch.tensor(self.targets[idx]).float()
-        frames = [Image.open(frame) for frame in frame_paths]
-        inputs = self.preprocessor(images=frames, return_tensors='pt')
-        return inputs, target
-
-    def load(self, phase: str = 'train', batch_size: int = 1,
-             num_workers: int = 0):
-        if phase == "train":
-            return DataLoader(dataset=self, batch_size=batch_size, shuffle=True,
-                              num_workers=num_workers)
-        return DataLoader(dataset=self, batch_size=batch_size, shuffle=False,
-                          num_workers=num_workers)
