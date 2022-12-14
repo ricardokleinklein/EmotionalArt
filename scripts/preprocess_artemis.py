@@ -24,6 +24,11 @@ from pathlib import Path
 
 
 ART_DIR = "/mnt/HDD/DATA/ARTEMIS/artemis_official_data/official_data/wikiart"
+ARTEMIS_EMOTIONS = ['amusement', 'awe', 'contentment', 'excitement',
+                    'anger', 'disgust',  'fear', 'sadness', 'something else']
+
+EMOTION_TO_IDX = {e: i for i, e in enumerate(ARTEMIS_EMOTIONS)}
+IDX_TO_EMOTION = {EMOTION_TO_IDX[e]: e for e in EMOTION_TO_IDX}
 
 
 def parse_args() -> argparse.Namespace:
@@ -52,6 +57,18 @@ def absolute_local_path(root: Path, painting_style: str, painting_name: str) \
     return root / painting_style / (painting_name + '.jpg')
 
 
+def emotion_to_int(emotion: str) -> int:
+    """ Map a feeling string (e.g. 'awe') to a unique integer.
+
+    Args:
+        emotion: Annotated emotion.
+
+    Returns:
+        index within EMOTION_TO_IDX
+    """
+    return EMOTION_TO_IDX[emotion]
+
+
 def main() -> None:
     args = parse_args()
     file = Path(args.src)
@@ -59,14 +76,16 @@ def main() -> None:
     img_root = Path(args.img_root)
     if not file.exists():
         raise IOError(f"Artemis file not found in {file}")
-    if not savedir.exists():
-        savedir.mkdir(parents=True, exist_ok=True)
 
     dataset = pandas.read_csv(file)
+    dataset['utterance'] = dataset['utterance'].apply(
+        lambda s: s + '.' if s[-1] != '.' else s
+    )
     dataset['localpath'] = dataset.apply(
         lambda x: absolute_local_path(img_root, x.art_style, x.painting),
         axis=1)
     dataset = dataset[dataset['localpath'].map(lambda s: s.exists())]
+    dataset['emotion_label'] = dataset['emotion'].apply(emotion_to_int)
     dataset.sort_values('painting', ascending=True, inplace=True,
                         ignore_index=True)
     dataset.to_csv(savedir, index=False)
