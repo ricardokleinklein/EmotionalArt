@@ -1,22 +1,18 @@
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from transformers import BertTokenizer
-from PIL import Image
-from typing import Tuple, Dict, List, Union
+from typing import Tuple, Dict, List, Union, Any
 
 import transformers
 import torch
 import numpy
 import pandas
-import glob
 
-# Type definition
-Array = numpy.ndarray
-DataFrame = pandas.DataFrame
-Loader = torch.utils.data.DataLoader
-Series = pandas.Series
-Tensor = torch.Tensor
-Tokenizer = transformers.PreTrainedTokenizer
+
+def multisentence_collate(data):
+    target = torch.stack([x[1] for x in data])
+    sentence_batch = [x[0] for x in data]
+    return sentence_batch, target
 
 
 class SentencesDataset(Dataset):
@@ -24,9 +20,9 @@ class SentencesDataset(Dataset):
     default_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
     def __init__(self,
-                 texts: Union[Array, List, Series],
-                 scores: Union[Array, List, Series],
-                 tokenizer: Tokenizer = None):
+                 texts: Union[numpy.ndarray, List, pandas.Series],
+                 scores: Union[numpy.ndarray, List, pandas.Series],
+                 tokenizer: transformers.PreTrainedTokenizer = None):
         """Default dataset used for regression over sentences.
 
         Args:
@@ -43,15 +39,16 @@ class SentencesDataset(Dataset):
 
     def __getitem__(self, idx) -> Tuple[Dict, float]:
         """Includes tokenization of the sample."""
-        sentence = self.texts[idx]
+        sentences = self.texts[idx].split('.')
+        sentences = sentences[:-1] if len(sentences) > 1 else sentences
         target = torch.tensor(self.targets[idx]).float()
-        tokenized = self.tokenizer(sentence, return_tensors="pt",
-                                   padding="max_length")
+        tokenized = self.tokenizer(sentences, return_tensors="pt",
+                                   padding="max_length", truncation=True)
         tokenized = {k: val.squeeze() for k, val in tokenized.items()}
         return tokenized, target
 
     def load(self, phase: str = 'train', batch_size: int = 32, num_workers:
-        int = 4) -> Loader:
+        int = 0) -> torch.utils.data.DataLoader:
         """Retrieve a DataLoader to ease the pipeline.
 
         Args:
@@ -64,23 +61,9 @@ class SentencesDataset(Dataset):
         """
         if phase == "train":
             return DataLoader(dataset=self, batch_size=batch_size,
-                              shuffle=True, num_workers=num_workers)
+                              shuffle=True, num_workers=num_workers,
+                              collate_fn=multisentence_collate)
         return DataLoader(dataset=self, batch_size=batch_size,
-                          shuffle=False, num_workers=num_workers)
-
-
-class OneImageToManySentences(Dataset):
-
-    def __init__(self, reference: pandas.DataFrame, key: str) -> None:
-        """
-
-        Args:
-            reference:
-            key:
-        """
-        self.df = reference
-        self.key = key
-
-    def __len__(self) -> int:
-        return len(self.df[self.key].unique())
+                          shuffle=False, num_workers=num_workers,
+                          collate_fn=multisentence_collate)
 

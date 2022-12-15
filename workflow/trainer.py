@@ -160,10 +160,10 @@ class Trainer:
                 batch_preds, batch_loss = self._step(data=batch,
                                                      step='eval',
                                                      use_best=use_best)
-                predictions.append(batch_preds.cpu().detach().numpy())
+                predictions.append(batch_preds)
                 loss_sum += batch_loss
-        predictions = numpy.array(predictions)
-        return torch.flatten(torch.Tensor(predictions)), loss_sum / b
+        predictions = torch.cat(predictions, axis=0)
+        return predictions, loss_sum / b
 
     def _step(self, data: Tuple, step: str = 'eval',
               use_best: bool = False) -> Tuple[Tensor, float]:
@@ -178,9 +178,10 @@ class Trainer:
             Batch loss.
         """
         batch_inputs, batch_labels = data
-        batch_inputs = {
-            k: val.to(self.device) for k, val in batch_inputs.items()
-        }
+        batch_inputs = [
+            {k: val.to(self.device) for k, val in x.items()}
+            for x in batch_inputs
+        ]
         batch_labels = batch_labels.to(self.device)
         if step != 'eval':
             self.optimizer.zero_grad()
@@ -206,11 +207,9 @@ class Trainer:
         Returns:
             Computed metrics if such a set is provided.
         """
-        _labels = torch.stack([batch[1] for batch in data_loader])
-        labels = torch.flatten(_labels)
-        predictions = torch.flatten(predictions)
+        _labels = torch.cat([batch[1] for batch in data_loader], axis=0)
         if self.metrics:
-            return self.metrics.compute(y=labels, y_hat=predictions)
+            return self.metrics.compute(y=_labels, y_hat=predictions)
         return None
 
     def has_improved(self, current_loss: Tensor,

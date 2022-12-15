@@ -153,14 +153,12 @@ class CustomTextualCLIP(nn.Module):
             z = self._simple(x)
 
         z = self.classifier(z)
-        return torch.sigmoid(z)
+        return torch.softmax(z)
 
     def _forward_multiple(self, x: Dict) -> Tensor:
         """Forward pass splitting in different sentences within each sample."""
-        bs = len(list(x.values())[0])
-        subsets = [{k: val[i] for k, val in x.items()} for i in range(bs)]
-        outcome = torch.stack([self._simple(x_i) for x_i in subsets], dim=0)
-        return torch.mean(outcome, dim=1)
+        z = [torch.mean(self._simple(x_i), dim=0) for x_i in x]
+        return torch.stack(z)
 
     def _simple(self, x: Dict) -> Tensor:
         z = self.base_text_clip(**x).pooler_output

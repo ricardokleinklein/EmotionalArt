@@ -14,10 +14,11 @@ from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import jaccard_score
+from sklearn.metrics import hamming_loss
 from sklearn.metrics import roc_auc_score
-from typing import Union, Dict
+from typing import Union, Dict, List, Optional, Tuple
 
-from base_metrics import Metrics
+from metrics.base_metrics import Metrics
 
 
 Array = numpy.array
@@ -76,3 +77,80 @@ class MultiLabelClsMetrics(Metrics):
             elif key == 'ROC-AUC':
                 raise FutureWarning('Feature to be implemented in future.')
         return metrics_
+
+
+class DistributionDistanceMetrics(Metrics):
+
+    metrics = {
+        'acc@1': {'value': 0,
+                  'mode': 'max'},
+        'acc@3': {'value': 0,
+                  'mode': 'max'},
+        'acc@5': {'value': 0,
+                  'mode': 'max'},
+        'hamming': {'value': 0,
+                    'mode': 'max'}
+    }
+
+    def __init__(self, additional_metrics: Dict = None) -> Dict:
+        super(DistributionDistanceMetrics, self).__init__(additional_metrics)
+        self.top = [1, 3, 5]
+
+    def compute(self, y: Tensor, y_hat: Tensor) -> Dict:
+        """ Run through the metrics considered and compute their values
+        given a set of reference values and a set of predictions.
+
+        Args:
+            y: (N, C) Actual label probability distribution.
+            y_hat: (N, C) Predicted probability distribution
+
+        Returns:
+            Value of the metrics considered.
+        """
+        metrics_ = dict()
+        for k in self.top:
+            y_k = torch.topk(y, k=k, dim=1)[1]
+            y_hat_k = torch.topk(y_hat, k=k, dim=1)[1]
+
+
+            y_k = y_k.detach().cpu().numpy()
+            y_hat_k = y_hat_k.detach().cpu().numpy()
+            if k > 1:
+                metrics_['hamming'] = self.average_hamming(y_k, y_hat_k)
+                metrics_[f"acc@{k}"] = self.accuracy(y_k, y_hat_k)
+            else:
+                metrics_[f'acc@{k}'] = self.accuracy(y_k, y_hat_k)
+        return metrics_
+
+    @staticmethod
+    def average_hamming(y: numpy.ndarray, y_hat: numpy.ndarray) -> float:
+        """ Compute the average hamming loss@3 for a series of samples
+        independently.
+
+        Args:
+            y: (N, K) Target labels.
+            y_hat: (N, K) Predicted labels.
+
+        Returns:
+            Average Hamming Loss
+        """
+        return numpy.mean([hamming_loss(i, j) for i, j in zip(y,
+                                                              y_hat)]).item()
+
+    @staticmethod
+    def accuracy(y: numpy.ndarray, y_hat: numpy.ndarray) -> float:
+        """ Compute accuracy scores for all the columns in a multilabel
+        classification problem.
+
+        Args:
+            y: (N, K) Target labels.
+            y_hat: (N, K) Predicted labels.
+
+        Returns:
+            Average accuracy score.
+        """
+        if y.shape[1] == 1:
+            return accuracy_score(y.squeeze(), y_hat.squeeze())
+        return numpy.mean([accuracy_score(i, j) for i, j in zip(y,
+                                                                y_hat)]).item()
+

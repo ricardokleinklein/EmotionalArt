@@ -129,16 +129,16 @@ class KFoldExperiment:
             train, val, test = make_splits(train_idxs, test_idxs, X, target)
 
             train_loader = self.data_reader(
-                train[0].values,
-                train[1].values,
+                train[0],
+                train[1],
                 **self.kwargs).load('train', batch_size)
             val_loader = self.data_reader(
-                val[0].values,
-                val[1].values,
+                val[0],
+                val[1],
                 **self.kwargs).load('val', batch_size)
             test_loader = self.data_reader(
-                test[0].values,
-                test[1].values,
+                test[0],
+                test[1],
                 **self.kwargs).load('test', batch_size)
 
             trainer = Trainer(model=model,

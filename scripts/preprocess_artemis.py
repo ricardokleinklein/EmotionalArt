@@ -22,16 +22,10 @@ import pandas
 
 from pathlib import Path
 from tqdm import tqdm
-from numpy.linalg import norm
 from sklearn.preprocessing import LabelBinarizer
 
 
 ART_DIR = "/mnt/HDD/DATA/ARTEMIS/artemis_official_data/official_data/wikiart"
-ARTEMIS_EMOTIONS = ['amusement', 'awe', 'contentment', 'excitement',
-                    'anger', 'disgust',  'fear', 'sadness', 'something else']
-
-EMOTION_TO_IDX = {e: i for i, e in enumerate(ARTEMIS_EMOTIONS)}
-IDX_TO_EMOTION = {EMOTION_TO_IDX[e]: e for e in EMOTION_TO_IDX}
 
 
 def parse_args() -> argparse.Namespace:
@@ -60,18 +54,6 @@ def absolute_local_path(root: Path, painting_style: str, painting_name: str) \
         Absolute local path of a painting.
     """
     return root / painting_style / (painting_name + '.jpg')
-
-
-def emotion_to_int(emotion: str) -> int:
-    """ Map a feeling string (e.g. 'awe') to a unique integer.
-
-    Args:
-        emotion: Annotated emotion.
-
-    Returns:
-        index within EMOTION_TO_IDX
-    """
-    return EMOTION_TO_IDX[emotion]
 
 
 def main() -> None:
