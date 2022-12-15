@@ -19,7 +19,7 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     args = parse_args()
-    artemis = pandas.read_csv(args.src).iloc[:100]
+    artemis = pandas.read_csv(args.src)
     loss = KLDivLoss(reduction="batchmean")
     metrics = DistributionDistanceMetrics()
     tokenizer = BPETokenizer('clip', seq_len=77)
@@ -39,7 +39,8 @@ def main():
                                      target=ground_truth,
                                      model=model,
                                      loss_fn=loss,
-                                     batch_size=4)
+                                     batch_size=12)
+    print(results_logging)
 
 
 if __name__ == "__main__":
