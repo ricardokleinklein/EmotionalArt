@@ -35,19 +35,12 @@ def main():
     )
     model = CustomTextualCLIP(num_classes=ground_truth.shape[1],
                               finetune=False, multisentence=True)
-    # ds = SentencesDataset(artemis['utterance'], ground_truth,
-    #                       tokenizer=tokenizer)
-    # loader = ds.load('train', batch_size=4, num_workers=0)
-    #
-    # batch = next(iter(loader))
-    # pred = model(batch[0])
-    # print(batch[1].shape, pred.shape)
     results_logging = experiment.run(X=artemis['utterance'].values,
                                      target=ground_truth,
                                      model=model,
                                      loss_fn=loss,
                                      batch_size=4)
-    # metrics.compute(batch[1], pred)
+
 
 if __name__ == "__main__":
     main()

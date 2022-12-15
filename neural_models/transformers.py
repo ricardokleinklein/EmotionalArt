@@ -153,7 +153,7 @@ class CustomTextualCLIP(nn.Module):
             z = self._simple(x)
 
         z = self.classifier(z)
-        return torch.softmax(z)
+        return nn.functional.softmax(z, dim=0)
 
     def _forward_multiple(self, x: Dict) -> Tensor:
         """Forward pass splitting in different sentences within each sample."""
