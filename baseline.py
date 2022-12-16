@@ -6,6 +6,7 @@ from data_preprocess.tokenizers import BPETokenizer
 from data_preprocess.datasets import SentencesDataset
 from neural_models.transformers import CustomTextualCLIP
 from metrics.multilabel_classification import DistributionDistanceMetrics
+from metrics.multilabel_classification import emd
 from workflow.kfolds import KFoldExperiment
 
 
@@ -19,8 +20,9 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     args = parse_args()
-    artemis = pandas.read_csv(args.src)
-    loss = KLDivLoss(reduction="batchmean")
+    artemis = pandas.read_csv(args.src)[:100]
+    # loss = KLDivLoss(reduction="batchmean")
+    loss = emd
     metrics = DistributionDistanceMetrics()
     tokenizer = BPETokenizer('clip', seq_len=77)
 
@@ -39,7 +41,7 @@ def main():
                                      target=ground_truth,
                                      model=model,
                                      loss_fn=loss,
-                                     batch_size=12)
+                                     batch_size=4)
     print(results_logging)
 
 

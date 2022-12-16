@@ -26,6 +26,13 @@ Series = pandas.Series
 Tensor = torch.Tensor
 
 
+def emd(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
+    # https://discuss.pytorch.org/t/implementation-of-squared-earth-movers-distance-loss-function-for-ordinal-scale/107927
+    return torch.mean(torch.mean(torch.square(torch.cumsum(y_true, dim=-1) -
+                                              torch.cumsum(y_pred, dim=-1)),
+                                 dim=-1))
+
+
 class MultiLabelClsMetrics(Metrics):
 
     metrics = {
@@ -89,7 +96,9 @@ class DistributionDistanceMetrics(Metrics):
         'acc@5': {'value': 0,
                   'mode': 'max'},
         'hamming': {'value': 0,
-                    'mode': 'max'}
+                    'mode': 'max'},
+        'EMD': {'value': 0,
+                'mode': 'min'}
     }
 
     def __init__(self, additional_metrics: Dict = None) -> Dict:
@@ -108,6 +117,7 @@ class DistributionDistanceMetrics(Metrics):
             Value of the metrics considered.
         """
         metrics_ = dict()
+        metrics_['EMD'] = emd(y, y_hat).item()
         for k in self.top:
             y_k = torch.topk(y, k=k, dim=1)[1]
             y_hat_k = torch.topk(y_hat, k=k, dim=1)[1]
@@ -153,4 +163,3 @@ class DistributionDistanceMetrics(Metrics):
             return accuracy_score(y.squeeze(), y_hat.squeeze())
         return numpy.mean([accuracy_score(i, j) for i, j in zip(y,
                                                                 y_hat)]).item()
-

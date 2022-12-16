@@ -59,8 +59,8 @@ class Trainer:
             self.model.parameters(), lr=kwargs.get('lr', 1e-5))
 
     def fit(self, train_data_loader: Loader, val_data_loader: Loader,
-            max_epochs: int = 500, patience: int = 5, verbose: bool = True) \
-            -> Dict:
+            max_epochs: int = 500, patience: int = 5, verbose: bool = True,
+            tol_eps: float = 0.0) -> Dict:
         """ Automatic pipeline for training a model.
 
         Args:
@@ -71,6 +71,8 @@ class Trainer:
             patience: Early-Stopping limit (epochs without improvement)
             before quitting a training process.
             verbose:
+            tol_eps: Minimum percentage of improvement for a model to be
+            considered better than a previous checkpoint.
 
         Returns:
             Log of the training losses and metrics of the validation split
@@ -100,7 +102,7 @@ class Trainer:
                 for name, value in val_metrics_state.items():
                     val_track[name].append(value)
 
-            if self.has_improved(val_loss, val_metrics_state):
+            if self.has_improved(val_loss, val_metrics_state, eps=tol_eps):
                 patience_left = patience
                 self.best_loss = val_loss
                 if self.metrics:
@@ -213,7 +215,7 @@ class Trainer:
         return None
 
     def has_improved(self, current_loss: Tensor,
-                     current_metrics: Dict = None) -> bool:
+                     current_metrics: Dict = None, eps: float = 0.0) -> bool:
         """
         Check whether a model can be considered better than another one
         based on loss and/or metrics.
@@ -221,15 +223,16 @@ class Trainer:
         Args:
             current_loss: Current loss value.
             current_metrics: Current value of a set of metrics.
+            eps: Minimum percentual improvement required.
 
         Returns:
             Whether a model's performance can be considered better.
         """
         if not current_metrics or self.monitor_metric == "loss":
-            return self._has_improved_loss(current_loss)
-        return self._has_improved_metrics(current_metrics)
+            return self._has_improved_loss(current_loss, eps=eps)
+        return self._has_improved_metrics(current_metrics, eps=eps)
 
-    def _has_improved_loss(self, current_loss: Tensor) -> bool:
+    def _has_improved_loss(self, current_loss: Tensor, eps: float) -> bool:
         """ Whether loss has decreased.
 
         TODO: Extend to losses that have to increase.
@@ -240,14 +243,16 @@ class Trainer:
         Returns:
             Have we achieved a smaller loss value?
         """
-        return True if current_loss < self.best_loss else False
+        threshold = current_loss + eps * current_loss
+        return True if threshold < self.best_loss else False
 
-    def _has_improved_metrics(self, current_metrics: Dict) -> bool:
+    def _has_improved_metrics(self, current_metrics: Dict, eps: float) -> bool:
         """ Whether the predictions made by a model outperform in terms of a
          set of metrics to that of previous steps.
 
         Args:
             current_metrics: Current value of a set of metrics.
+            eps: Minimum percentual improvement required.
 
         Returns:
             Whether the metrics have seen an improvement or not.
@@ -256,5 +261,7 @@ class Trainer:
         current_value = current_metrics[self.monitor_metric]
         current_best = self.metrics[self.monitor_metric]
         if mode == "max":
-            return True if current_value > current_best else False
-        return True if current_value < current_best else False
+            threshold = current_value - eps * current_value
+            return True if threshold > current_best else False
+        threshold = current_value + eps * current_value
+        return True if threshold < current_best else False

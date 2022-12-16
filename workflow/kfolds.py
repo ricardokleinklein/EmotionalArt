@@ -151,7 +151,8 @@ class KFoldExperiment:
             val_log = trainer.fit(train_data_loader=train_loader,
                                   val_data_loader=val_loader,
                                   max_epochs=self.max_epochs,
-                                  patience=self.patience)
+                                  patience=self.patience,
+                                  tol_eps=0.01)
             test_preds, test_loss = trainer.eval(data_loader=test_loader,
                                                  use_best=True,
                                                  verbose=True)
