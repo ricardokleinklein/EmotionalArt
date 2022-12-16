@@ -20,7 +20,7 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     args = parse_args()
-    artemis = pandas.read_csv(args.src)[:100]
+    artemis = pandas.read_csv(args.src)
     # loss = KLDivLoss(reduction="batchmean")
     loss = emd
     metrics = DistributionDistanceMetrics()
@@ -36,12 +36,12 @@ def main():
         artemis["emotion"]]
     )
     model = CustomTextualCLIP(num_classes=ground_truth.shape[1],
-                              finetune=False, multisentence=True)
+                              finetune=True, multisentence=True)
     results_logging = experiment.run(X=artemis['utterance'].values,
                                      target=ground_truth,
                                      model=model,
                                      loss_fn=loss,
-                                     batch_size=4)
+                                     batch_size=12)
     print(results_logging)
 
 

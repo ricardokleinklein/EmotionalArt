@@ -196,7 +196,7 @@ class Trainer:
         if step != 'eval':
             batch_loss.backward()
             self.optimizer.step()
-        return batch_preds, batch_loss
+        return batch_preds.detach(), batch_loss.detach()
 
     def assess(self, data_loader: Loader, predictions: Tensor) -> \
             Optional[Dict]:
@@ -209,9 +209,9 @@ class Trainer:
         Returns:
             Computed metrics if such a set is provided.
         """
-        _labels = torch.cat([batch[1] for batch in data_loader], axis=0)
+        _labels = torch.cat([batch[1].detach() for batch in data_loader], axis=0)
         if self.metrics:
-            return self.metrics.compute(y=_labels, y_hat=predictions)
+            return self.metrics.compute(y=_labels, y_hat=predictions.cpu())
         return None
 
     def has_improved(self, current_loss: Tensor,
