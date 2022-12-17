@@ -8,18 +8,15 @@ looking for a system to evaluate your pretrained model, go through the
 Trainer class for a smooth experience.
 
 TODO: Swap to a cleaner LOG system.
-TODO: Clean up verbose.
-TODO: Save best model in disk.
 TODO: Enable changing the optimizer.
-TODO: Enable args-based hyperparameter tuning.
 """
 import copy
-import numpy
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
 from tqdm import tqdm
+from pathlib import Path
 from typing import Callable, Dict, Optional, Union, Tuple
 
 from metrics.base_metrics import Metrics
@@ -58,19 +55,16 @@ class Trainer:
         self.optimizer = optim.AdamW(
             self.model.parameters(), lr=kwargs.get('lr', 1e-5))
 
-    def fit(self, train_data_loader: Loader, val_data_loader: Loader,
-            max_epochs: int = 500, patience: int = 5, verbose: bool = True,
-            tol_eps: float = 0.0) -> Dict:
-        """ Automatic pipeline for training a model.
+    def fit(self, data_loader: Loader, max_epochs: int = 500,
+            patience: int = 5, verbose: bool = True, tol_eps: float = 0.0
+            ) -> Dict:
+        """ Automatic pipeline to train a model.
 
         Args:
-            train_data_loader: Training data, ust contain inputs and labels.
-            val_data_loader: Data to evaluate, must contain input features and
-            labels.
+            data_loader: Training data, ust contain inputs and labels.
             max_epochs: Maximum amount of epochs the model will train for.
             patience: Early-Stopping limit (epochs without improvement)
             before quitting a training process.
-            verbose:
             tol_eps: Minimum percentage of improvement for a model to be
             considered better than a previous checkpoint.
 
@@ -78,35 +72,36 @@ class Trainer:
             Log of the training losses and metrics of the validation split
             of data.
         """
-        val_track = dict()
+        track = dict()
         print('Computing initial model performance...')
-        init_preds, current_loss = self.eval(val_data_loader, verbose=True)
+        init_preds, current_loss = self.eval(data_loader, verbose=True)
         self.best_loss = current_loss
-        val_track['loss'] = [float(current_loss.cpu().detach().numpy())]
+        track['loss'] = [current_loss]
 
         if self.metrics:
             self.metrics.__init__()
-            val_metrics_state = self.assess(val_data_loader, init_preds)
-            self.metrics.update(val_metrics_state)
-            val_track = {**val_track, **{k: [val] for k, val in
-                                         val_metrics_state.items()}}
+            metrics_state = self.assess(data_loader, init_preds)
+            self.metrics.update(metrics_state)
+            track = {**track, **{k: [val] for k, val in
+                                     metrics_state.items()}}
         patience_left = patience
         for epoch in range(max_epochs):
             print(f'Epoch {epoch + 1} / {max_epochs}')
-            _ = self.train_epoch(train_data_loader, verbose=verbose)
-            val_preds, val_loss = self.eval(val_data_loader, verbose=verbose)
-            val_track['loss'].append(float(val_loss.cpu().detach().numpy()))
-            val_metrics_state = self.assess(val_data_loader, val_preds)
-            print(val_metrics_state)
-            if val_metrics_state is not None:
-                for name, value in val_metrics_state.items():
-                    val_track[name].append(value)
+            epoch_preds, epoch_loss = self.train_epoch(data_loader,
+                                                   verbose=verbose)
+            track['loss'].append(epoch_loss)
+            metrics_state = self.assess(data_loader, epoch_preds)
+            if metrics_state is not None:
+                for name, value in metrics_state.items():
+                    track[name].append(value)
+            if verbose:
+                print(f"Loss: {epoch_loss}, Metrics state:\n{metrics_state}")
 
-            if self.has_improved(val_loss, val_metrics_state, eps=tol_eps):
+            if self.has_improved(epoch_loss, metrics_state, eps=tol_eps):
                 patience_left = patience
-                self.best_loss = val_loss
+                self.best_loss = epoch_loss
                 if self.metrics:
-                    self.metrics.update(val_metrics_state)
+                    self.metrics.update(metrics_state)
                 print('Saving new model...')
                 self.best_model = copy.deepcopy(self.model)
             else:
@@ -115,9 +110,10 @@ class Trainer:
                 if patience_left < 1:
                     print('[Early-Stopping]: Leaving training loop...')
                     break
-        return val_track
+        return track
 
-    def train_epoch(self, data_loader: Loader, verbose: bool = True) -> float:
+    def train_epoch(self, data_loader: Loader, verbose: bool = True
+                    ) -> Tuple[Tensor, float]:
         """ A complete training pass throughout the samples of the dataset.
 
         Args:
@@ -131,12 +127,14 @@ class Trainer:
         loss_sum = 0.0
         self.model.train()
         hide_bar = True if not verbose else False
+        predictions = []
         for b, batch in enumerate(tqdm(data_loader, disable=hide_bar)):
-            _, batch_loss = self._step(data=batch,
+            batch_preds, batch_loss = self._step(data=batch,
                                        step='train',
                                        use_best=False)
+            predictions.append(batch_preds)
             loss_sum += batch_loss
-        return loss_sum / b
+        return torch.cat(predictions, axis=0), loss_sum / b
 
     def eval(self, data_loader: Loader, use_best: bool = False,
              verbose: bool = True) -> Tuple[Tensor, float]:
@@ -196,7 +194,7 @@ class Trainer:
         if step != 'eval':
             batch_loss.backward()
             self.optimizer.step()
-        return batch_preds.detach(), batch_loss.detach()
+        return batch_preds.detach(), batch_loss.detach().item()
 
     def assess(self, data_loader: Loader, predictions: Tensor) -> \
             Optional[Dict]:
@@ -209,7 +207,8 @@ class Trainer:
         Returns:
             Computed metrics if such a set is provided.
         """
-        _labels = torch.cat([batch[1].detach() for batch in data_loader], axis=0)
+        _labels = torch.cat(
+            [batch[1].detach() for batch in data_loader], axis=0)
         if self.metrics:
             return self.metrics.compute(y=_labels, y_hat=predictions.cpu())
         return None
@@ -265,3 +264,16 @@ class Trainer:
             return True if threshold > current_best else False
         threshold = current_value + eps * current_value
         return True if threshold < current_best else False
+
+    def save(self, to_file: Path, use_best: bool = True) -> None:
+        """ Save model to file.
+
+        Args:
+            to_file: Path to save model in.
+            use_best: If true, save self.best_model.
+
+        """
+        if use_best:
+            torch.save(self.best_model.state_dict(), to_file)
+        else:
+            torch.save(self.model.state_dict(), to_file)

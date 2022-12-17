@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from transformers import BertTokenizer
-from typing import Tuple, Dict, List, Union, Any
+from typing import Tuple, Dict, List, Union
 
 import transformers
 import torch
@@ -22,17 +22,18 @@ class SentencesDataset(Dataset):
     def __init__(self,
                  texts: Union[numpy.ndarray, List, pandas.Series],
                  scores: Union[numpy.ndarray, List, pandas.Series],
-                 tokenizer: transformers.PreTrainedTokenizer = None):
+                 processor: transformers.PreTrainedTokenizer = None):
         """Default dataset used for regression over sentences.
 
         Args:
             texts: Array of texts of the corpus.
             scores: Array of ground-truth labels to compare with.
-            tokenizer: Method to split words (BPE-scheme-like).
+            processor: Method to split words (BPE-scheme-like).
         """
         self.texts = texts
         self.targets = scores
-        self.tokenizer = self.default_tokenizer if tokenizer is None else tokenizer
+        self.tokenizer = self.default_tokenizer if processor is None else \
+            processor
 
     def __len__(self) -> int:
         return len(self.targets)

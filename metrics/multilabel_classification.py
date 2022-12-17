@@ -91,10 +91,6 @@ class DistributionDistanceMetrics(Metrics):
     metrics = {
         'acc@1': {'value': 0,
                   'mode': 'max'},
-        'acc@3': {'value': 0,
-                  'mode': 'max'},
-        'acc@5': {'value': 0,
-                  'mode': 'max'},
         'hamming@3': {'value': 0,
                     'mode': 'max'},
         'EMD': {'value': 0,
@@ -118,20 +114,13 @@ class DistributionDistanceMetrics(Metrics):
         """
         metrics_ = dict()
         metrics_['EMD'] = emd(y, y_hat).item()
-        for k in self.top:
-            y_k = torch.topk(y, k=k, dim=1)[1]
-            y_hat_k = torch.topk(y_hat, k=k, dim=1)[1]
+        y1 = torch.topk(y, k=1, dim=1)[1].detach().cpu().numpy()
+        y_hat1 = torch.topk(y_hat, k=1, dim=1)[1].detach().cpu().numpy()
+        metrics_['acc@1'] = accuracy_score(y1.squeeze(), y_hat1.squeeze())
 
-
-            y_k = y_k.detach().cpu().numpy()
-            y_hat_k = y_hat_k.detach().cpu().numpy()
-            if k > 1:
-                #metrics_['hamming'] = self.average_hamming(y_k, y_hat_k)
-                metrics_[f"acc@{k}"] = self.accuracy(y_k, y_hat_k)
-            else:
-                metrics_[f'acc@{k}'] = self.accuracy(y_k, y_hat_k)
-            if k == 3:
-                metrics_['hamming@3'] = self.average_hamming(y_k, y_hat_k)
+        y3 = torch.topk(y, k=3, dim=1)[1].detach().cpu().numpy()
+        y_hat3 = torch.topk(y_hat, k=3, dim=1)[1].detach().cpu().numpy()
+        metrics_['hamming@3'] = self.average_hamming(y3, y_hat3)
         return metrics_
 
     @staticmethod
@@ -149,19 +138,3 @@ class DistributionDistanceMetrics(Metrics):
         return numpy.mean([hamming_loss(i, j) for i, j in zip(y,
                                                               y_hat)]).item()
 
-    @staticmethod
-    def accuracy(y: numpy.ndarray, y_hat: numpy.ndarray) -> float:
-        """ Compute accuracy scores for all the columns in a multilabel
-        classification problem.
-
-        Args:
-            y: (N, K) Target labels.
-            y_hat: (N, K) Predicted labels.
-
-        Returns:
-            Average accuracy score.
-        """
-        if y.shape[1] == 1:
-            return accuracy_score(y.squeeze(), y_hat.squeeze())
-        return numpy.mean([accuracy_score(i, j) for i, j in zip(y,
-                                                                y_hat)]).item()
