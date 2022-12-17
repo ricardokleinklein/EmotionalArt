@@ -48,11 +48,12 @@ def make_splits(train_idxs: List, test_idxs: List, X: Union[Array, Series],
     """
     X_train_, X_test = X[train_idxs], X[test_idxs]
     y_train_, y_test = target[train_idxs], target[test_idxs]
-    X_train, X_val, y_train, y_val = train_test_split(X_train_, y_train_,
-                                                      test_size=val_size,
-                                                      random_state=1234,
-                                                      shuffle=True)
-    return (X_train, y_train), (X_val, y_val), (X_test, y_test)
+#    X_train, X_val, y_train, y_val = train_test_split(X_train_, y_train_,
+#                                                      test_size=val_size,
+#                                                      random_state=1234,
+#                                                      shuffle=True)
+#    return (X_train, y_train), (X_val, y_val), (X_test, y_test)
+    return (X_train_, y_train_), (X_test, y_test)
 
 
 class KFoldExperiment:
@@ -126,16 +127,17 @@ class KFoldExperiment:
         for k, fold_k in enumerate(fold_generator):
             print(f'[NEW FOLD: {k+1}/{self.num_folds}]')
             train_idxs, test_idxs = fold_k
-            train, val, test = make_splits(train_idxs, test_idxs, X, target)
+#            train, val, test = make_splits(train_idxs, test_idxs, X, target)
+            train, test = make_splits(train_idxs, test_idxs, X, target)
 
             train_loader = self.data_reader(
                 train[0],
                 train[1],
                 **self.kwargs).load('train', batch_size)
-            val_loader = self.data_reader(
-                val[0],
-                val[1],
-                **self.kwargs).load('val', batch_size)
+#            val_loader = self.data_reader(
+#                val[0],
+#                val[1],
+#                **self.kwargs).load('val', batch_size)
             test_loader = self.data_reader(
                 test[0],
                 test[1],
@@ -148,13 +150,16 @@ class KFoldExperiment:
                               device=self.device,
                               verbose=False)
 
-            val_log = trainer.fit(train_data_loader=train_loader,
-                                  val_data_loader=val_loader,
-                                  max_epochs=self.max_epochs,
-                                  patience=self.patience,
-                                  tol_eps=0.01)
+#            val_log = trainer.fit(train_data_loader=train_loader,
+#                                  val_data_loader=val_loader,
+#                                  max_epochs=self.max_epochs,
+#                                  patience=self.patience,
+#                                  tol_eps=0.01)
+            for epoch in range(self.max_epochs):
+                trainer.train_epoch(train_loader)
+
             test_preds, test_loss = trainer.eval(data_loader=test_loader,
-                                                 use_best=True,
+                                                 use_best=False,
                                                  verbose=True)
             test_metrics = trainer.assess(data_loader=test_loader,
                                           predictions=test_preds)

@@ -95,7 +95,7 @@ class DistributionDistanceMetrics(Metrics):
                   'mode': 'max'},
         'acc@5': {'value': 0,
                   'mode': 'max'},
-        'hamming': {'value': 0,
+        'hamming@3': {'value': 0,
                     'mode': 'max'},
         'EMD': {'value': 0,
                 'mode': 'min'}
@@ -126,10 +126,12 @@ class DistributionDistanceMetrics(Metrics):
             y_k = y_k.detach().cpu().numpy()
             y_hat_k = y_hat_k.detach().cpu().numpy()
             if k > 1:
-                metrics_['hamming'] = self.average_hamming(y_k, y_hat_k)
+                #metrics_['hamming'] = self.average_hamming(y_k, y_hat_k)
                 metrics_[f"acc@{k}"] = self.accuracy(y_k, y_hat_k)
             else:
                 metrics_[f'acc@{k}'] = self.accuracy(y_k, y_hat_k)
+            if k == 3:
+                metrics_['hamming@3'] = self.average_hamming(y_k, y_hat_k)
         return metrics_
 
     @staticmethod
