@@ -1,7 +1,7 @@
 """ Preprocess Artemis
 
-This script is aimed at the structuring and standarding of the original
-Artemis data file (once cleaned as indicated in the original paper).
+This script is aimed at the structuring and standardizing of the original
+Artemis data file.
 
 Because our setup is different from theirs, we do not respect the split of
 the data, given our working unit is the individual painting and not the
