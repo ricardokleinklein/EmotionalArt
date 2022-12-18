@@ -17,6 +17,7 @@ Optional arguments:
 import argparse
 import numpy
 import pandas
+from torch.nn import KLDivLoss
 from data_preprocess.tokenizers import BPETokenizer
 from data_preprocess.datasets import SentencesDataset
 from neural_models.transformers import CustomTextualCLIP
@@ -41,6 +42,8 @@ def parse_args() -> argparse.Namespace:
                         help="Epochs before Early-Stopping")
     parser.add_argument("-b", "--batch", type=int, default=32,
                         help="Batch size")
+    parser.add_argument("--loss", type=str, default='kldiv',
+                        choices=['kldiv', 'emd'], help="Loss function")
     parser.add_argument("--eps", type=float, default=0.05,
                         help="Minimum improvement required during training")
     parser.add_argument("-k", "--kfolds", type=int, default=5,
@@ -56,7 +59,7 @@ def parse_args() -> argparse.Namespace:
 def main():
     args = parse_args()
     artemis = pandas.read_csv(args.src)
-    loss = emd
+    loss = KLDivLoss(reduction='batchmean') if args.loss == "kldiv" else emd
     metrics = DistributionDistanceMetrics()
     tokenizer = BPETokenizer('clip', seq_len=77)
 
