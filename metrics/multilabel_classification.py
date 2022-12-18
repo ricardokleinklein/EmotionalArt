@@ -26,10 +26,19 @@ Series = pandas.Series
 Tensor = torch.Tensor
 
 
-def emd(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
+def emd(target: torch.Tensor, input: torch.Tensor) -> torch.Tensor:
+    """ Earth-Moving Distance function.
+
+    Args:
+        target: Reference distribution.
+        input: Predicted distribution
+
+    Returns:
+        EMD between both distribution
+    """
     # https://discuss.pytorch.org/t/implementation-of-squared-earth-movers-distance-loss-function-for-ordinal-scale/107927
-    return torch.mean(torch.mean(torch.square(torch.cumsum(y_true, dim=-1) -
-                                              torch.cumsum(y_pred, dim=-1)),
+    return torch.mean(torch.mean(torch.square(torch.cumsum(target, dim=-1) -
+                                              torch.cumsum(input, dim=-1)),
                                  dim=-1))
 
 

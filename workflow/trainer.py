@@ -188,8 +188,8 @@ class Trainer:
         batch_preds = self.model(batch_inputs) if not use_best else \
             self.best_model(batch_inputs)
         batch_loss = self.loss_fn(
-            torch.squeeze(batch_labels),
-            torch.squeeze(batch_preds)
+            target=torch.squeeze(batch_labels),
+            input=torch.squeeze(batch_preds)
         )
         if step != 'eval':
             batch_loss.backward()
