@@ -83,7 +83,8 @@ def main():
                                  processor=tokenizer,
                                  model=model,
                                  loss_fn=loss,
-                                 batch_size=args.batch)
+                                 batch_size=args.batch,
+                                 eps=args.eps)
     print(results_logging)
 
 

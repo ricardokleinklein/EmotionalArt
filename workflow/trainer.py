@@ -234,16 +234,18 @@ class Trainer:
     def _has_improved_loss(self, current_loss: Tensor, eps: float) -> bool:
         """ Whether loss has decreased.
 
-        TODO: Extend to losses that have to increase.
-
         Args:
             current_loss: Current loss value
 
         Returns:
             Have we achieved a smaller loss value?
         """
-        threshold = current_loss + eps * current_loss
-        return True if threshold < self.best_loss else False
+        if self.best_loss < 0:
+            threshold = self.best_loss - (eps * self.best_loss)
+            print(self.best_loss, threshold, current_loss)
+            return True if current_loss > threshold else False
+        threshold = self.best_loss - (eps * self.best_loss)
+        return True if current_loss < threshold else False
 
     def _has_improved_metrics(self, current_metrics: Dict, eps: float) -> bool:
         """ Whether the predictions made by a model outperform in terms of a
