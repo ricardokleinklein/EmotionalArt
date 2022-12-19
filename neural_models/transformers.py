@@ -153,7 +153,7 @@ class CustomTextualCLIP(nn.Module):
             z = self._simple(x)
 
         z = self.classifier(z)
-        return nn.functional.log_softmax(z, dim=0)
+        return nn.functional.log_softmax(z, dim=1)
 
     def _forward_multiple(self, x: Dict) -> Tensor:
         """Forward pass splitting in different sentences within each sample."""
@@ -196,7 +196,8 @@ class CustomVisualCLIP(nn.Module):
             for layer in [self.base_visual_clip, self.base_visual_proj]:
                 for param in layer.parameters():
                     param.requires_grad = False
-        self.classifier = nn.Linear(self.base_visual_proj.out_features, num_classes)
+        self.classifier = nn.Linear(self.base_visual_proj.out_features,
+                                    num_classes)
 
     def forward(self, x: Dict) -> Tensor:
         """ Pass forward.
@@ -211,4 +212,4 @@ class CustomVisualCLIP(nn.Module):
         z = self.base_visual_clip(**x).pooler_output
         z = self.base_visual_proj(z)
         z = self.classifier(z)
-        return torch.mean(torch.sigmoid(z))
+        return nn.functional.log_softmax(z, dim=1)

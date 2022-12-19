@@ -70,7 +70,6 @@ class KFoldExperiment:
             random_seed: Initial random seed.
             name: Name assigned to the experiment.
             save_models: Directory in which models are saved.
-
         """
         self.data_reader = data_reader
         self.num_folds = num_folds
@@ -103,7 +102,8 @@ class KFoldExperiment:
                  model: nn.Module,
                  loss_fn: Union[nn.Module, Callable],
                  batch_size: int = 32,
-                 eps: float = 0.05) -> Dict:
+                 eps: float = 0.05,
+                 learning_rate: float = 1e-5) -> Dict:
         """ Proceed with the experimentation over the folds, each as a
         separate trial.
 
@@ -112,6 +112,7 @@ class KFoldExperiment:
             target: Target labels.
             model: Neural model.
             batch_size: Batch size.
+            learning_rate: Initial learning rate.
 
         Returns:
             Fold-wise summary of validation and test results.
@@ -135,6 +136,7 @@ class KFoldExperiment:
                               metrics=self.metrics,
                               monitor_metric=self.monitor_metric,
                               device=self.device,
+                              learning_rate=learning_rate,
                               verbose=True)
             trainer.fit(data_loader=train_loader,
                         max_epochs=self.max_epochs, patience=self.patience,

@@ -33,6 +33,7 @@ class Trainer:
                  metrics: Metrics,
                  monitor_metric: str,
                  device: torch.device,
+                 learning_rate: float = 1e-5,
                  *args, **kwargs):
         """ Systematize a typical lifecycle of a machine learning
         pipeline, including training, validating and testing one.
@@ -52,8 +53,7 @@ class Trainer:
 
         self.best_model = copy.deepcopy(model)
         self.best_loss = 0
-        self.optimizer = optim.AdamW(
-            self.model.parameters(), lr=kwargs.get('lr', 1e-5))
+        self.optimizer = optim.AdamW(self.model.parameters(), lr=learning_rate)
 
     def fit(self, data_loader: Loader, max_epochs: int = 500,
             patience: int = 5, verbose: bool = True, tol_eps: float = 0.0
