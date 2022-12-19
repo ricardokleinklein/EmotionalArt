@@ -12,18 +12,23 @@ from pathlib import Path
 from sklearn.model_selection import KFold
 from typing import Any, Callable, Dict, List, Optional, Union, Tuple
 
+from torch import device
+
 from metrics.base_metrics import Metrics
 from workflow.trainer import Trainer
 
 
-def detect_device():
-    """ Is there any GPU available? If so, which one to use?"""
-    # TODO: Manually select which GPU you wish to use as an arg.
-    # TODO: Verbosa info about found GPUs.
+def set_device(device: Optional[str] = None) -> device:
     if not torch.cuda.is_available():
-        return "cpu"
-    # torch.cuda.empty_cache()
-    return "cuda:0" if torch.cuda.device_count() > 1 else "cuda"
+        return torch.device("cpu")
+    if device is not None:
+        return torch.device(device)
+    nb_gpu = torch.cuda.device_count()
+    if nb_gpu == 1:
+        return torch.device("cuda")
+    for gpu in range(nb_gpu):
+        if torch.cuda.memory_usage(gpu) == 0:
+            return torch.device(f"cuda:{gpu}")
 
 
 def make_splits(train_idxs: List, test_idxs: List,
@@ -56,7 +61,8 @@ class KFoldExperiment:
                  monitor_metric: str = 'loss',
                  random_seed: int = 1234,
                  name: str = "KFoldExperiment",
-                 save_models: Optional[str] = None) -> None:
+                 save_models: Optional[str] = None,
+                 device: str = "cuda") -> None:
         """ K-Fold Cross Validation Experimentation pipeline.
 
         Args:
@@ -70,6 +76,7 @@ class KFoldExperiment:
             random_seed: Initial random seed.
             name: Name assigned to the experiment.
             save_models: Directory in which models are saved.
+            device: Device on which to run the experiment.
         """
         self.data_reader = data_reader
         self.num_folds = num_folds
@@ -82,10 +89,11 @@ class KFoldExperiment:
         self.save_models = Path(save_models)
 
         self._set_random_seed()
-        self.device = torch.device(detect_device())
+        self.device = set_device(device=device)
 
         self.k_folder = KFold(n_splits=num_folds, shuffle=True,
                               random_state=random_seed)
+        print(self.device)
 
     def _set_random_seed(self):
         """ Fix the initial random seed for the experiment."""

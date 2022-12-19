@@ -67,6 +67,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-s", "--save", type=str,
                         help="Save models after training")
     parser.add_argument("--seed", type=int, default=1234, help="Random seed")
+    parser.add_argument("--device", type=str, default="cuda",
+                        help="Device on which to run the experiment")
     return parser.parse_args()
 
 
@@ -85,7 +87,8 @@ def main():
                                  patience=args.patience,
                                  random_seed=args.seed,
                                  name=args.name,
-                                 save_models=args.save)
+                                 save_models=args.save,
+                                 device=args.device)
     ground_truth = numpy.array([
         numpy.fromstring(s[1:-1], dtype=float, sep=' ') for s in \
         artemis["emotion"]]
