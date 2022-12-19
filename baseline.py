@@ -19,11 +19,21 @@ import numpy
 import pandas
 from torch.nn import KLDivLoss
 from data_preprocess.tokenizers import BPETokenizer
-from data_preprocess.datasets import SentencesDataset
-from neural_models.transformers import CustomTextualCLIP
+from data_preprocess.datasets import SentencesDataset, ImageDataset
+from neural_models.transformers import CustomTextualCLIP, CustomVisualCLIP
 from metrics.multilabel_classification import DistributionDistanceMetrics
 from metrics.multilabel_classification import emd
 from workflow.kfolds import KFoldExperiment
+
+
+BRANCH_CONFIG = {'text': {'reader': SentencesDataset,
+                          'feat_col': 'utterance',
+                          'processor': BPETokenizer('clip', seq_len=77)},
+                 'vision': {'reader': ImageDataset,
+                            'feat_col': 'localpath',
+                            'processor': None},
+                 'late': None,
+                 'align': None}
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,7 +41,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=formatter)
     parser.add_argument("src", type=str, help="Original Artemis CSV")
-
+    parser.add_argument("branch", type=str, default="vision",
+                        choices=["text", "vision", "late", "align"],
+                        help="Branch to experiment with, or fusion style")
     parser.add_argument("-f", "--finetune", action="store_true",
                         help="If True, train only classification layer(s)")
     parser.add_argument("-m", "--monitor", type=str, default="loss",
@@ -42,6 +54,8 @@ def parse_args() -> argparse.Namespace:
                         help="Epochs before Early-Stopping")
     parser.add_argument("-b", "--batch", type=int, default=32,
                         help="Batch size")
+    parser.add_argument("--lr", type=float, default=1e-5,
+                        help="Initial learning rate")
     parser.add_argument("--loss", type=str, default='kldiv',
                         choices=['kldiv', 'emd'], help="Loss function")
     parser.add_argument("--eps", type=float, default=0.05,
@@ -58,12 +72,12 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     args = parse_args()
-    artemis = pandas.read_csv(args.src)
+    artemis = pandas.read_csv(args.src)[:50]
+    branch = args.branch
     loss = KLDivLoss(reduction='batchmean') if args.loss == "kldiv" else emd
     metrics = DistributionDistanceMetrics()
-    tokenizer = BPETokenizer('clip', seq_len=77)
 
-    experiment = KFoldExperiment(data_reader=SentencesDataset,
+    experiment = KFoldExperiment(data_reader=BRANCH_CONFIG[branch]['reader'],
                                  num_folds=args.kfolds,
                                  max_epochs=args.epochs,
                                  metrics=metrics,
@@ -76,15 +90,23 @@ def main():
         numpy.fromstring(s[1:-1], dtype=float, sep=' ') for s in \
         artemis["emotion"]]
     )
-    model = CustomTextualCLIP(num_classes=ground_truth.shape[1],
-                              finetune=args.finetune, multisentence=True)
-    results_logging = experiment(X=artemis['utterance'].values,
-                                 target=ground_truth,
-                                 processor=tokenizer,
-                                 model=model,
-                                 loss_fn=loss,
-                                 batch_size=args.batch,
-                                 eps=args.eps)
+
+    model_opts = {'text': CustomTextualCLIP(
+        num_classes=ground_truth.shape[1], finetune=args.finetune,
+        multisentence=True),
+        'vision': CustomVisualCLIP(num_classes=ground_truth.shape[1],
+                                   finetune=args.finetune)
+    }
+
+    results_logging = experiment(
+        X=artemis[BRANCH_CONFIG[branch]['feat_col']].values,
+        target=ground_truth,
+        processor=BRANCH_CONFIG[branch]['processor'],
+        model=model_opts[branch],
+        loss_fn=loss,
+        batch_size=args.batch,
+        eps=args.eps,
+        learning_rate=args.lr)
     print(results_logging)
 
 

@@ -178,10 +178,14 @@ class Trainer:
             Batch loss.
         """
         batch_inputs, batch_labels = data
-        batch_inputs = [
-            {k: val.to(self.device) for k, val in x.items()}
-            for x in batch_inputs
-        ]
+        if isinstance(batch_inputs, list):
+            batch_inputs = [
+                {k: val.to(self.device) for k, val in x.items()}
+                for x in batch_inputs
+            ]
+        else:
+            batch_inputs = {k: val.to(self.device)
+                            for k, val in batch_inputs.items()}
         batch_labels = batch_labels.to(self.device)
         if step != 'eval':
             self.optimizer.zero_grad()

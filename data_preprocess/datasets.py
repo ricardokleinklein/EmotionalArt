@@ -1,7 +1,9 @@
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
+from PIL import Image
 from transformers import BertTokenizer
-from typing import Tuple, Dict, List, Union
+from transformers import CLIPFeatureExtractor
+from typing import Tuple, Dict, List, Union, Optional
 
 import transformers
 import torch
@@ -68,3 +70,58 @@ class SentencesDataset(Dataset):
                           shuffle=False, num_workers=num_workers,
                           collate_fn=multisentence_collate)
 
+class ImageDataset(Dataset):
+
+    default = CLIPFeatureExtractor.from_pretrained(
+        "openai/clip-vit-base-patch32"
+    )
+
+    def __init__(self,
+                 image_paths: Union[numpy.ndarray, List],
+                 scores: Union[numpy.ndarray, List],
+                 processor: transformers.FeatureExtractionMixin = None
+                 ) -> None:
+        """
+
+        Args:
+            image_paths:
+            scores:
+            processor:
+        """
+        self.paths = image_paths
+        self.targets = scores
+        self.processor = self.default if processor is None else processor
+
+    def __len__(self) -> int:
+        return len(self.targets)
+
+    def __getitem__(self, idx) -> Tuple[Dict, float]:
+        """
+
+        Args:
+            idx:
+
+        Returns:
+
+        """
+        image = Image.open(self.paths[idx])
+        target = torch.tensor(self.targets[idx]).float()
+        pixels = self.processor(image, return_tensors='pt')
+        pixels = {k: val.squeeze() for k, val in pixels.items()}
+        return pixels, target
+
+    def load(self, phase: str = 'train', batch_size: int = 32, num_workers:
+        int = 0) -> torch.utils.data.DataLoader:
+        """Retrieve a DataLoader to ease the pipeline.
+
+        Args:
+            phase: Whether it's train or test.
+            batch_size: Samples per batch.
+            num_workers: Cores to use.
+
+        Returns:
+            an iterable torch DataLoader.
+        """
+        shuffle = True if phase == "train" else False
+        return DataLoader(dataset=self, batch_size=batch_size,
+                          shuffle=shuffle, num_workers=num_workers)
