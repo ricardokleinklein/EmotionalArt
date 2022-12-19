@@ -65,7 +65,7 @@ class Trainer:
             max_epochs: Maximum amount of epochs the model will train for.
             patience: Early-Stopping limit (epochs without improvement)
             before quitting a training process.
-            tol_eps: Minimum percentage of improvement for a model to be
+            tol_eps: Minimum absolute improvement for a model to be
             considered better than a previous checkpoint.
 
         Returns:
@@ -226,7 +226,7 @@ class Trainer:
         Args:
             current_loss: Current loss value.
             current_metrics: Current value of a set of metrics.
-            eps: Minimum percentual improvement required.
+            eps: Minimum improvement required.
 
         Returns:
             Whether a model's performance can be considered better.
@@ -245,10 +245,10 @@ class Trainer:
             Have we achieved a smaller loss value?
         """
         if self.best_loss < 0:
-            threshold = self.best_loss - (eps * self.best_loss)
+            threshold = self.best_loss + eps
             print(self.best_loss, threshold, current_loss)
             return True if current_loss > threshold else False
-        threshold = self.best_loss - (eps * self.best_loss)
+        threshold = self.best_loss - eps
         return True if current_loss < threshold else False
 
     def _has_improved_metrics(self, current_metrics: Dict, eps: float) -> bool:
@@ -266,9 +266,9 @@ class Trainer:
         current_value = current_metrics[self.monitor_metric]
         current_best = self.metrics[self.monitor_metric]
         if mode == "max":
-            threshold = current_value - eps * current_value
+            threshold = current_value - eps
             return True if threshold > current_best else False
-        threshold = current_value + eps * current_value
+        threshold = current_value + eps
         return True if threshold < current_best else False
 
     def save(self, to_file: Path, use_best: bool = True) -> None:

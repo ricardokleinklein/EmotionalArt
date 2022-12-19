@@ -148,6 +148,8 @@ class KFoldExperiment:
             test_metrics = trainer.assess(data_loader=test_loader,
                                           predictions=test_preds)
             fold_results[f'fold_{k+1}'] = test_metrics
+            print(f'[TEST IN FOLD {k+1}/{self.num_folds}')
+            print(f"Loss: {test_loss.item()}\nMetrics:{test_metrics}")
 
             if self.save_models is not None:
                 trainer.save(self.save_models / (self.name + f"_fold_{k}.pt"))

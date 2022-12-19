@@ -72,7 +72,7 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     args = parse_args()
-    artemis = pandas.read_csv(args.src)[:50]
+    artemis = pandas.read_csv(args.src)
     branch = args.branch
     loss = KLDivLoss(reduction='batchmean') if args.loss == "kldiv" else emd
     metrics = DistributionDistanceMetrics()
