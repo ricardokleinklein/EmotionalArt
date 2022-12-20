@@ -24,6 +24,7 @@ from neural_models.transformers import CustomTextualCLIP, CustomVisualCLIP
 from metrics.multilabel_classification import DistributionDistanceMetrics
 from metrics.multilabel_classification import emd
 from workflow.kfolds import KFoldExperiment
+from loggers.tensorboard_log import Logger
 
 
 BRANCH_CONFIG = {'text': {'reader': SentencesDataset,
@@ -74,10 +75,11 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     args = parse_args()
-    artemis = pandas.read_csv(args.src)
+    artemis = pandas.read_csv(args.src)[:100]
     branch = args.branch
     loss = KLDivLoss(reduction='batchmean') if args.loss == "kldiv" else emd
     metrics = DistributionDistanceMetrics()
+    logger = Logger(args=None)
 
     experiment = KFoldExperiment(data_reader=BRANCH_CONFIG[branch]['reader'],
                                  num_folds=args.kfolds,
