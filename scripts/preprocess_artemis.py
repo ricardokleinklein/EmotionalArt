@@ -12,17 +12,25 @@ Positional arguments:
     dst             Location to save the newly created file
 
 Optional arguments:
-    --img_root      Local directory where images are saved
+    --artdir        Local directory where images are saved
+    --val           Val size
+    --test          Test size
+    -s, --seed      Random seed
+    -q, --quiet     Hide messages
     -h, --help      Show this help message and exit
 
 
 """
 import argparse
+import numpy
 import pandas
 
 from pathlib import Path
 from tqdm import tqdm
 from sklearn.preprocessing import LabelBinarizer
+from sklearn.model_selection import train_test_split
+
+pandas.options.mode.chained_assignment = None  # default='warn'
 
 
 ART_DIR = "/mnt/HDD/DATA/ARTEMIS/artemis_official_data/official_data/wikiart"
@@ -32,10 +40,15 @@ def parse_args() -> argparse.Namespace:
     formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=formatter)
-    parser.add_argument("src", type=str, help="Original Artemis CSV")
+    parser.add_argument("src", type=str, help="Artemis Data (processed "
+                                              "according to the paper)'s CSV")
     parser.add_argument("dst", type=str, help="Location to save new file")
-    parser.add_argument("--artdir", type=str,
-                        help="Image local directory", default=ART_DIR)
+    parser.add_argument("--artdir", type=str, default=ART_DIR,
+                        help="Image local directory")
+    parser.add_argument("--val", type=float, default=0.15, help="Val size")
+    parser.add_argument("--test", type=float, default=0.25, help="Test size")
+    parser.add_argument("-s", "--seed", type=int, default=1234,
+                        help="Random seed")
     parser.add_argument("-q", "--quiet", help="Hide messages",
                         action="store_true")
     return parser.parse_args()
@@ -65,15 +78,17 @@ def main() -> None:
         raise IOError(f"Artemis file not found in {file}")
 
     dataset = pandas.read_csv(file)
-    dataset['utterance'] = dataset['utterance'].apply(
-        lambda s: s + '.' if s[-1] != '.' else s
-    )   # Append a dot to the end of a sentence if it doesn't have one
 
     # Check all artworks are available locally
     dataset['localpath'] = dataset.apply(
         lambda x: absolute_local_path(img_root, x.art_style, x.painting),
         axis=1)     # Obtain image paths in the local system
     dataset = dataset[dataset['localpath'].map(lambda s: s.exists())]
+
+    # Append a dot to the end of a sentence if it doesn't have one
+    dataset['utterance'] = dataset['utterance_spelled'].apply(
+        lambda s: s + '.' if s[-1] != '.' else s
+    )
 
     # Merging all utterances to a single one for each artwork
     # Also, turn individual emotion labels into probability distributions
@@ -82,19 +97,33 @@ def main() -> None:
     label_bin = LabelBinarizer()
     label_bin.fit(dataset['emotion'].unique())
     emotion_dists = []
+    most_emotion = []
     for artwork in tqdm(unique_artworks, total=len(unique_artworks),
                         disable=args.quiet):
         subset = dataset[dataset['painting'] == artwork]
         merged_utterances.append(''.join(subset['utterance']))
         emotion_count = label_bin.transform(subset['emotion']).sum(axis=0)
+        most_emotion.append(numpy.argmax(emotion_count))
         emotion_dists.append(emotion_count / emotion_count.sum())
-
     dataset.drop_duplicates(subset='painting', inplace=True)
     dataset['utterance'] = merged_utterances
     dataset['emotion'] = emotion_dists
+    dataset['emotion_label'] = most_emotion
+
+    # Select partitions stratified by majority emotion of the artwork
+    dev, test = train_test_split(dataset.index, test_size=args.test,
+                                 random_state=args.seed,
+                                 stratify=dataset['emotion_label'])
+    train, val = train_test_split(dev, test_size=args.val,
+                                  random_state=args.seed,
+                                  stratify=dataset.loc[dev]['emotion_label'])
+    dataset['split'].loc[train] = "train"
+    dataset['split'].loc[val] = "val"
+    dataset['split'].loc[test] = "test"
 
     # Sort them alphabetically
     dataset.sort_values(by='painting', inplace=True)
+    dataset.reset_index(inplace=True)
     dataset.to_csv(savedir, index=False)
 
 

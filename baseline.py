@@ -10,8 +10,7 @@ Optional arguments:
     -m, --monitor           Metric to assess the progress of the training
     -p, --patience          Epochs to wait before early-stopping
     -b, --batch             Batch size
-    --name                  Name of the experiment
-    --save_models           Whether to save models after each apoch
+    --save_models           Whether to save models after each epoch
 
 """
 import argparse
@@ -23,7 +22,7 @@ from data_preprocess.datasets import SentencesDataset, ImageDataset
 from neural_models.transformers import CustomTextualCLIP, CustomVisualCLIP
 from metrics.multilabel_classification import DistributionDistanceMetrics
 from metrics.multilabel_classification import emd
-from workflow.kfolds import KFoldExperiment
+from workflow.trainer import Trainer
 from loggers.tensorboard_log import Logger
 
 
@@ -45,6 +44,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("branch", type=str, default="vision",
                         choices=["text", "vision", "late", "align"],
                         help="Branch to experiment with, or fusion style")
+    parser.add_argument("--val", action="store_true",
+                        help="If set, evaluate over val data. test otherwise")
     parser.add_argument("-f", "--finetune", action="store_true",
                         help="If True, train only classification layer(s)")
     parser.add_argument("-m", "--monitor", type=str, default="loss",
@@ -61,11 +62,9 @@ def parse_args() -> argparse.Namespace:
                         choices=['kldiv', 'emd'], help="Loss function")
     parser.add_argument("--eps", type=float, default=0.05,
                         help="Minimum improvement required during training")
-    parser.add_argument("-k", "--kfolds", type=int, default=5,
-                        help="Number of folds")
-    parser.add_argument("--name", type=str, default="KfoldExp",
+    parser.add_argument("--log_dir", type=str, default=None,
                         help="Name for the experiment")
-    parser.add_argument("-s", "--save", type=str,
+    parser.add_argument("-s", "--save", action="store_true",
                         help="Save models after training")
     parser.add_argument("--seed", type=int, default=1234, help="Random seed")
     parser.add_argument("--device", type=str, default="cuda",
@@ -73,46 +72,53 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def tonumpy(str_dists: pandas.Series) -> numpy.ndarray:
+    """
+
+    """
+    return numpy.array([
+        numpy.fromstring(s[1:-1], dtype=float, sep=' ') for s in str_dists])
+
+
 def main():
+    # Read command line arguments
     args = parse_args()
-    artemis = pandas.read_csv(args.src)[:100]
+    artemis = pandas.read_csv(args.src)
     branch = args.branch
     loss = KLDivLoss(reduction='batchmean') if args.loss == "kldiv" else emd
+
+    # Experiment environment: metrics, logger, ground-truth...
     metrics = DistributionDistanceMetrics()
-    logger = Logger(args=None)
+    logger = Logger(log_dir=args.log_dir, args=args)
 
-    experiment = KFoldExperiment(data_reader=BRANCH_CONFIG[branch]['reader'],
-                                 num_folds=args.kfolds,
-                                 max_epochs=args.epochs,
-                                 metrics=metrics,
-                                 monitor_metric=args.monitor,
-                                 patience=args.patience,
-                                 random_seed=args.seed,
-                                 name=args.name,
-                                 save_models=args.save,
-                                 device=args.device)
-    ground_truth = numpy.array([
-        numpy.fromstring(s[1:-1], dtype=float, sep=' ') for s in \
-        artemis["emotion"]]
-    )
+    if args.val:
+        train_data = artemis[artemis['split'] == "train"]
+        test_data = artemis[artemis['split'] == "val"]
+    else:
+        train_data = artemis[artemis['split'].isin(["train", "val"])]
+        test_data = artemis[artemis['split'] == "test"]
+    data_reader = BRANCH_CONFIG[args.branch]['reader']
+    feat_col = BRANCH_CONFIG[args.branch]['feat_col']
+    processor = BRANCH_CONFIG[args.branch]['processor']
 
-    model_opts = {'text': CustomTextualCLIP(
-        num_classes=ground_truth.shape[1], finetune=args.finetune,
-        multisentence=True),
-        'vision': CustomVisualCLIP(num_classes=ground_truth.shape[1],
-                                   finetune=args.finetune)
-    }
+    train = data_reader(train_data[feat_col],
+                        scores=tonumpy(train_data['emotion']),
+                        processor=processor)
+    print(train[0])
 
-    results_logging = experiment(
-        X=artemis[BRANCH_CONFIG[branch]['feat_col']].values,
-        target=ground_truth,
-        processor=BRANCH_CONFIG[branch]['processor'],
-        model=model_opts[branch],
-        loss_fn=loss,
-        batch_size=args.batch,
-        eps=args.eps,
-        learning_rate=args.lr)
-    print(results_logging)
+    # model_opts = {'text': CustomTextualCLIP(
+    #     num_classes=ground_truth.shape[1], finetune=args.finetune,
+    #     multisentence=True),
+    #     'vision': CustomVisualCLIP(num_classes=ground_truth.shape[1],
+    #                                finetune=args.finetune)
+    # }
+    # trainer = Trainer(model=model_opts[args.branch],
+    #                   loss_fn=loss, metrics=metrics,
+    #                   monitor_metric=args.monitor, device=args.device,
+    #                   learning_rate=args.lr, logger=logger)
+
+
+    logger.close()
 
 
 if __name__ == "__main__":

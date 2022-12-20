@@ -17,6 +17,7 @@ import torch.optim as optim
 
 from tqdm import tqdm
 from pathlib import Path
+from torch.utils.tensorboard import SummaryWriter
 from typing import Callable, Dict, Optional, Union, Tuple
 
 from metrics.base_metrics import Metrics
@@ -34,9 +35,12 @@ class Trainer:
                  monitor_metric: str,
                  device: torch.device,
                  learning_rate: float = 1e-5,
+                 logger: Optional[SummaryWriter] = None,
                  *args, **kwargs):
         """ Systematize a typical lifecycle of a machine learning
         pipeline, including training, validating and testing one.
+
+        TODO: Switch to model checkpoint.
 
         Args:
             model: Torch model to work with.
@@ -44,12 +48,14 @@ class Trainer:
             metrics: Metrics to assess the training and evaluation by.
             monitor_metric: Monitor to ponder performance.
             device: Which device to use (CPU / GPU).
+            logger: Initialized logger on which to dump training logs.
         """
         self.model = copy.deepcopy(model).to(device)
         self.loss_fn = loss_fn
         self.metrics = metrics
         self.monitor_metric = monitor_metric
         self.device = device
+        self.logger = logger
 
         self.best_model = copy.deepcopy(model)
         self.best_loss = 0

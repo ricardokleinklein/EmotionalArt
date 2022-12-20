@@ -7,6 +7,7 @@ import random
 import torch
 import torch.nn as nn
 import transformers
+from torch.utils.tensorboard import SummaryWriter
 
 from pathlib import Path
 from sklearn.model_selection import KFold
@@ -60,8 +61,8 @@ class KFoldExperiment:
                  metrics: Metrics = None,
                  monitor_metric: str = 'loss',
                  random_seed: int = 1234,
-                 name: str = "KFoldExperiment",
-                 save_models: Optional[str] = None,
+                 log_dir: Optional[Union[str, Path]] = None,
+                 save_models: bool = False,
                  device: str = "cuda") -> None:
         """ K-Fold Cross Validation Experimentation pipeline.
 
@@ -74,8 +75,8 @@ class KFoldExperiment:
             metrics: Relevant metrics to take into account.
             monitor_metric: Name of the metric to assess a model by.
             random_seed: Initial random seed.
-            name: Name assigned to the experiment.
-            save_models: Directory in which models are saved.
+            log_dir: Name assigned to the experiment.
+            save_models: If True, save models.
             device: Device on which to run the experiment.
         """
         self.data_reader = data_reader
@@ -85,15 +86,14 @@ class KFoldExperiment:
         self.metrics = metrics
         self.monitor_metric = monitor_metric
         self.seed = random_seed
-        self.name = name
-        self.save_models = Path(save_models)
+        self.name = log_dir
+        self.save_models = save_models
 
         self._set_random_seed()
         self.device = set_device(device=device)
 
         self.k_folder = KFold(n_splits=num_folds, shuffle=True,
                               random_state=random_seed)
-        print(self.device)
 
     def _set_random_seed(self):
         """ Fix the initial random seed for the experiment."""
@@ -111,7 +111,9 @@ class KFoldExperiment:
                  loss_fn: Union[nn.Module, Callable],
                  batch_size: int = 32,
                  eps: float = 0.05,
-                 learning_rate: float = 1e-5) -> Dict:
+                 learning_rate: float = 1e-5,
+                 logger: Optional[SummaryWriter] = None
+                 ) -> Dict:
         """ Proceed with the experimentation over the folds, each as a
         separate trial.
 
@@ -125,14 +127,20 @@ class KFoldExperiment:
         Returns:
             Fold-wise summary of validation and test results.
         """
-        if self.save_models is not None:
-                self.save_models.mkdir(parents=True, exist_ok=True)
         fold_generator = self.k_folder.split(X, target)
         fold_results = dict()
         for k, fold_k in enumerate(fold_generator):
-            print(f'\n[NEW FOLD: {k+1}/{self.num_folds}]')
+            fold_str = f'\n[NEW FOLD: {k+1}/{self.num_folds}]'
+            print(fold_str)
             train_idxs, test_idxs = fold_k
             train, test = make_splits(train_idxs, test_idxs, X, target)
+
+            if logger is not None:
+                suffix = f"fold_{k+1}"
+                logger.filename_suffix = suffix
+                logger.write(f"{fold_str}\n\t#Train samples: "
+                             f"{len(train[1])}\n\t# Test samples: "
+                             f"{len(test[1])}")
 
             train_loader = self.data_reader(train[0], train[1],
                 processor=processor).load('train', batch_size)
@@ -145,6 +153,7 @@ class KFoldExperiment:
                               monitor_metric=self.monitor_metric,
                               device=self.device,
                               learning_rate=learning_rate,
+                              logger=logger,
                               verbose=True)
             trainer.fit(data_loader=train_loader,
                         max_epochs=self.max_epochs, patience=self.patience,

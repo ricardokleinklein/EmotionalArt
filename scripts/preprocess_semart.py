@@ -11,7 +11,7 @@ Optional arguments:
     --img_root      Local directory where images are saved
     -h, --help      Show this help message and exit
 
-
+TODO: sent_tokenizer. Now some sentences are not correctly split
 """
 import argparse
 import pandas
