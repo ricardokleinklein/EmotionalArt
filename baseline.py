@@ -16,6 +16,7 @@ Optional arguments:
 import argparse
 import numpy
 import pandas
+from pathlib import Path
 from torch.nn import KLDivLoss
 from data_preprocess.tokenizers import BPETokenizer
 from data_preprocess.datasets import SentencesDataset, ImageDataset
@@ -84,7 +85,6 @@ def main():
     # Read command line arguments
     args = parse_args()
     artemis = pandas.read_csv(args.src)
-    branch = args.branch
     loss = KLDivLoss(reduction='batchmean') if args.loss == "kldiv" else emd
 
     # Experiment environment: metrics, logger, ground-truth...
@@ -101,23 +101,35 @@ def main():
     feat_col = BRANCH_CONFIG[args.branch]['feat_col']
     processor = BRANCH_CONFIG[args.branch]['processor']
 
-    train = data_reader(train_data[feat_col],
+    train = data_reader(train_data[feat_col].values,
                         scores=tonumpy(train_data['emotion']),
                         processor=processor)
-    print(train[0])
+    train_loader = train.load(phase="train", batch_size=args.batch)
+    test = data_reader(test_data[feat_col].values,
+                       scores=tonumpy(test_data['emotion']),
+                       processor=processor)
+    test_loader = test.load(phase="test", batch_size=args.batch)
+    val_loader = test_loader if args.val else None
+    nb_emotions = len(artemis['emotion_label'].unique())
+    model_opts = {'text': CustomTextualCLIP(num_classes=nb_emotions,
+                                            finetune=args.finetune,
+                                            multisentence=True),
+                  'vision': CustomVisualCLIP(num_classes=nb_emotions,
+                                             finetune=args.finetune)}
+    trainer = Trainer(model=model_opts[args.branch], loss_fn=loss,
+                      metrics=metrics, monitor_metric=args.monitor,
+                      device=args.device, learning_rate=args.lr, logger=logger)
+    trainer.fit(data_loader=train_loader, val_loader=val_loader,
+                max_epochs=args.epochs, patience=args.patience,
+                tol_eps=args.eps)
+    test_preds, test_loss = trainer.eval(data_loader=test_loader,
+                                         use_best=True, verbose=True)
+    test_metrics = trainer.assess(data_loader=test_loader,
+                                  predictions=test_preds)
+    print(f"Loss: {test_loss}\nMetrics:{test_metrics}")
 
-    # model_opts = {'text': CustomTextualCLIP(
-    #     num_classes=ground_truth.shape[1], finetune=args.finetune,
-    #     multisentence=True),
-    #     'vision': CustomVisualCLIP(num_classes=ground_truth.shape[1],
-    #                                finetune=args.finetune)
-    # }
-    # trainer = Trainer(model=model_opts[args.branch],
-    #                   loss_fn=loss, metrics=metrics,
-    #                   monitor_metric=args.monitor, device=args.device,
-    #                   learning_rate=args.lr, logger=logger)
-
-
+    if args.save:
+        trainer.save(Path(logger.log_dir) / "model_state_dict.pt")
     logger.close()
 
 

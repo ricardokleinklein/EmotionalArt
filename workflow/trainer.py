@@ -61,9 +61,9 @@ class Trainer:
         self.best_loss = 0
         self.optimizer = optim.AdamW(self.model.parameters(), lr=learning_rate)
 
-    def fit(self, data_loader: Loader, max_epochs: int = 500,
-            patience: int = 5, verbose: bool = True, tol_eps: float = 0.0
-            ) -> Dict:
+    def fit(self, data_loader: Loader, val_loader: Optional[Loader] = None,
+            max_epochs: int = 500, patience: int = 5, verbose: bool = True,
+            tol_eps: float = 0.0) -> Dict:
         """ Automatic pipeline to train a model.
 
         Args:
@@ -80,13 +80,14 @@ class Trainer:
         """
         track = dict()
         print('Computing initial model performance...')
-        init_preds, current_loss = self.eval(data_loader, verbose=True)
+        assess_loader = val_loader if val_loader is not None else data_loader
+        init_preds, current_loss = self.eval(assess_loader, verbose=True)
         self.best_loss = current_loss
         track['loss'] = [current_loss]
 
         if self.metrics:
             self.metrics.__init__()
-            metrics_state = self.assess(data_loader, init_preds)
+            metrics_state = self.assess(assess_loader, init_preds)
             self.metrics.update(metrics_state)
             track = {**track, **{k: [val] for k, val in
                                      metrics_state.items()}}
@@ -95,8 +96,10 @@ class Trainer:
             print(f'Epoch {epoch + 1} / {max_epochs}')
             epoch_preds, epoch_loss = self.train_epoch(data_loader,
                                                    verbose=verbose)
+            if val_loader is not None:
+                epoch_preds, epoch_loss = self.eval(data_loader=val_loader)
             track['loss'].append(epoch_loss)
-            metrics_state = self.assess(data_loader, epoch_preds)
+            metrics_state = self.assess(assess_loader, epoch_preds)
             if metrics_state is not None:
                 for name, value in metrics_state.items():
                     track[name].append(value)
