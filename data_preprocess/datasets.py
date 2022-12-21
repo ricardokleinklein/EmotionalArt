@@ -1,6 +1,7 @@
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from PIL import Image
+from nltk.tokenize import sent_tokenize
 from transformers import BertTokenizer
 from transformers import CLIPFeatureExtractor
 from typing import Tuple, Dict, List, Union, Optional
@@ -42,12 +43,11 @@ class SentencesDataset(Dataset):
 
     def __getitem__(self, idx) -> Tuple[Dict, float]:
         """Includes tokenization of the sample."""
-        sentences = self.texts[idx].split('.')
-        sentences = sentences[:-1] if len(sentences) > 1 else sentences
+        sentences = sent_tokenize(self.texts[idx])
         target = torch.tensor(self.targets[idx]).float()
         tokenized = self.tokenizer(sentences, return_tensors="pt",
                                    padding="max_length", truncation=True)
-        tokenized = {k: val.squeeze() for k, val in tokenized.items()}
+        #tokenized = {k: val for k, val in tokenized.items()}
         return tokenized, target
 
     def load(self, phase: str = 'train', batch_size: int = 32, num_workers:

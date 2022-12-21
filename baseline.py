@@ -110,6 +110,7 @@ def main():
                        processor=processor)
     test_loader = test.load(phase="test", batch_size=args.batch)
     val_loader = test_loader if args.val else None
+
     nb_emotions = len(artemis['emotion_label'].unique())
     model_opts = {'text': CustomTextualCLIP(num_classes=nb_emotions,
                                             finetune=args.finetune,

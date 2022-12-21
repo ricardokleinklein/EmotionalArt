@@ -87,7 +87,7 @@ def main() -> None:
 
     # Append a dot to the end of a sentence if it doesn't have one
     dataset['utterance'] = dataset['utterance_spelled'].apply(
-        lambda s: s + '.' if s[-1] != '.' else s
+        lambda s: s + '.' if s[-1] != '. ' else s
     )
 
     # Merging all utterances to a single one for each artwork
@@ -101,6 +101,9 @@ def main() -> None:
     for artwork in tqdm(unique_artworks, total=len(unique_artworks),
                         disable=args.quiet):
         subset = dataset[dataset['painting'] == artwork]
+        if len(subset) < 2:
+            subset = pandas.concat([subset, subset])
+
         merged_utterances.append(''.join(subset['utterance']))
         emotion_count = label_bin.transform(subset['emotion']).sum(axis=0)
         most_emotion.append(numpy.argmax(emotion_count))
@@ -114,7 +117,8 @@ def main() -> None:
     dev, test = train_test_split(dataset.index, test_size=args.test,
                                  random_state=args.seed,
                                  stratify=dataset['emotion_label'])
-    train, val = train_test_split(dev, test_size=args.val,
+    nb_val = int(args.val * len(dataset))
+    train, val = train_test_split(dev, test_size=nb_val,
                                   random_state=args.seed,
                                   stratify=dataset.loc[dev]['emotion_label'])
     dataset['split'].loc[train] = "train"
