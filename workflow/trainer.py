@@ -17,9 +17,9 @@ import torch.optim as optim
 
 from tqdm import tqdm
 from pathlib import Path
-from torch.utils.tensorboard import SummaryWriter
 from typing import Callable, Dict, Optional, Union, Tuple
 
+import loggers.baselog
 from metrics.base_metrics import Metrics
 
 Loader = torch.utils.data.DataLoader
@@ -35,7 +35,7 @@ class Trainer:
                  monitor_metric: str,
                  device: torch.device,
                  learning_rate: float = 1e-5,
-                 logger: Optional[SummaryWriter] = None,
+                 logger: Optional[loggers.baselog.Logger] = None,
                  *args, **kwargs):
         """ Systematize a typical lifecycle of a machine learning
         pipeline, including training, validating and testing one.
@@ -79,7 +79,7 @@ class Trainer:
             of data.
         """
         track = dict()
-        print('Computing initial model performance...')
+        self.logger('Computing initial model performance...')
         assess_loader = val_loader if val_loader is not None else data_loader
         init_preds, current_loss = self.eval(assess_loader, verbose=True)
         self.best_loss = current_loss
@@ -93,7 +93,7 @@ class Trainer:
                                      metrics_state.items()}}
         patience_left = patience
         for epoch in range(max_epochs):
-            print(f'Epoch {epoch + 1} / {max_epochs}')
+            self.logger(f'Epoch {epoch + 1} / {max_epochs}')
             epoch_preds, epoch_loss = self.train_epoch(data_loader,
                                                    verbose=verbose)
             if val_loader is not None:
@@ -104,20 +104,21 @@ class Trainer:
                 for name, value in metrics_state.items():
                     track[name].append(value)
             if verbose:
-                print(f"Loss: {epoch_loss}, Metrics state:\n{metrics_state}")
+                self.logger(f"Loss: {epoch_loss}; Metrics state"
+                            f":{metrics_state}")
 
             if self.has_improved(epoch_loss, metrics_state, eps=tol_eps):
                 patience_left = patience
                 self.best_loss = epoch_loss
                 if self.metrics:
                     self.metrics.update(metrics_state)
-                print('Saving new model...')
+                self.logger('Saving new model...')
                 self.best_model = copy.deepcopy(self.model)
             else:
                 patience_left -= 1
-                print(f'Patience left: {patience_left} epochs.')
+                self.logger(f'Patience left: {patience_left} epochs.')
                 if patience_left < 1:
-                    print('[Early-Stopping]: Leaving training loop...')
+                    self.logger('[Early-Stopping]: Leaving training loop...')
                     break
         return track
 
@@ -255,7 +256,6 @@ class Trainer:
         """
         if self.best_loss < 0:
             threshold = self.best_loss + eps
-            print(self.best_loss, threshold, current_loss)
             return True if current_loss > threshold else False
         threshold = self.best_loss - eps
         return True if current_loss < threshold else False

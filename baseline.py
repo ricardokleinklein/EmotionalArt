@@ -16,7 +16,6 @@ Optional arguments:
 import argparse
 import numpy
 import pandas
-from pathlib import Path
 from torch.nn import KLDivLoss
 from data_preprocess.tokenizers import BPETokenizer
 from data_preprocess.datasets import SentencesDataset, ImageDataset
@@ -24,7 +23,7 @@ from neural_models.transformers import CustomTextualCLIP, CustomVisualCLIP
 from metrics.multilabel_classification import DistributionDistanceMetrics
 from metrics.multilabel_classification import emd
 from workflow.trainer import Trainer
-from loggers.tensorboard_log import Logger
+from loggers.baselog import Logger
 
 
 BRANCH_CONFIG = {'text': {'reader': SentencesDataset,
@@ -84,12 +83,14 @@ def tonumpy(str_dists: pandas.Series) -> numpy.ndarray:
 def main():
     # Read command line arguments
     args = parse_args()
-    artemis = pandas.read_csv(args.src)
+    artemis = pandas.read_csv(args.src)[:150]
     loss = KLDivLoss(reduction='batchmean') if args.loss == "kldiv" else emd
 
     # Experiment environment: metrics, logger, ground-truth...
     metrics = DistributionDistanceMetrics()
-    logger = Logger(log_dir=args.log_dir, args=args)
+    logger = Logger(log_dir=args.log_dir)
+    logger(f"Experiment configuration:\n"
+           f" {[f'{k}={v!r}' for k, v in args.__dict__.items()]}")
 
     if args.val:
         train_data = artemis[artemis['split'] == "train"]
@@ -97,6 +98,8 @@ def main():
     else:
         train_data = artemis[artemis['split'].isin(["train", "val"])]
         test_data = artemis[artemis['split'] == "test"]
+    logger(f"\n\tNb train samples: {len(train_data)}\n\tNb eval samples: "
+           f"{len(test_data)}")
     data_reader = BRANCH_CONFIG[args.branch]['reader']
     feat_col = BRANCH_CONFIG[args.branch]['feat_col']
     processor = BRANCH_CONFIG[args.branch]['processor']
@@ -112,6 +115,7 @@ def main():
     val_loader = test_loader if args.val else None
 
     nb_emotions = len(artemis['emotion_label'].unique())
+    logger(f"\n\tNb categories: {nb_emotions}")
     model_opts = {'text': CustomTextualCLIP(num_classes=nb_emotions,
                                             finetune=args.finetune,
                                             multisentence=True),
@@ -127,10 +131,11 @@ def main():
                                          use_best=True, verbose=True)
     test_metrics = trainer.assess(data_loader=test_loader,
                                   predictions=test_preds)
-    print(f"Loss: {test_loss}\nMetrics:{test_metrics}")
+    logger(f"Loss: {test_loss}\nMetrics:{test_metrics}")
 
     if args.save:
-        trainer.save(Path(logger.log_dir) / "model_state_dict.pt")
+        logger("Saving model's state dict in disk.")
+        trainer.save(logger.log_dir / "model_state_dict.pt")
     logger.close()
 
 

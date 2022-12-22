@@ -2,9 +2,9 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from PIL import Image
 from nltk.tokenize import sent_tokenize
-from transformers import BertTokenizer
+from transformers import BertTokenizer, BatchEncoding
 from transformers import CLIPFeatureExtractor
-from typing import Tuple, Dict, List, Union, Optional
+from typing import Tuple, Dict, List, Union, Any
 
 import transformers
 import torch
@@ -41,17 +41,16 @@ class SentencesDataset(Dataset):
     def __len__(self) -> int:
         return len(self.targets)
 
-    def __getitem__(self, idx) -> Tuple[Dict, float]:
+    def __getitem__(self, idx) -> Tuple[BatchEncoding, Any]:
         """Includes tokenization of the sample."""
         sentences = sent_tokenize(self.texts[idx])
         target = torch.tensor(self.targets[idx]).float()
         tokenized = self.tokenizer(sentences, return_tensors="pt",
                                    padding="max_length", truncation=True)
-        #tokenized = {k: val for k, val in tokenized.items()}
         return tokenized, target
 
-    def load(self, phase: str = 'train', batch_size: int = 32, num_workers:
-        int = 0) -> torch.utils.data.DataLoader:
+    def load(self, phase: str = 'train', batch_size: int = 32,
+             num_workers: int = 0) -> torch.utils.data.DataLoader:
         """Retrieve a DataLoader to ease the pipeline.
 
         Args:
@@ -69,6 +68,7 @@ class SentencesDataset(Dataset):
         return DataLoader(dataset=self, batch_size=batch_size,
                           shuffle=False, num_workers=num_workers,
                           collate_fn=multisentence_collate)
+
 
 class ImageDataset(Dataset):
 
@@ -110,8 +110,8 @@ class ImageDataset(Dataset):
         pixels = {k: val.squeeze() for k, val in pixels.items()}
         return pixels, target
 
-    def load(self, phase: str = 'train', batch_size: int = 32, num_workers:
-        int = 0) -> torch.utils.data.DataLoader:
+    def load(self, phase: str = 'train', batch_size: int = 32,
+             num_workers: int = 0) -> torch.utils.data.DataLoader:
         """Retrieve a DataLoader to ease the pipeline.
 
         Args:
