@@ -24,6 +24,7 @@ from neural_models.transformers import CustomTextualCLIP, CustomVisualCLIP
 from metrics.multilabel_classification import DistributionDistanceMetrics
 from metrics.multilabel_classification import emd
 from workflow.trainer import Trainer
+from workflow.kfolds import set_device
 from loggers.tensorboard_log import Logger
 
 
@@ -86,6 +87,7 @@ def main():
     args = parse_args()
     artemis = pandas.read_csv(args.src)
     loss = KLDivLoss(reduction='batchmean') if args.loss == "kldiv" else emd
+    device = set_device(args.device)
 
     # Experiment environment: metrics, logger, ground-truth...
     metrics = DistributionDistanceMetrics()
