@@ -23,9 +23,11 @@ def set_device(device: Optional[str] = None) -> device:
     if not torch.cuda.is_available():
         return torch.device("cpu")
     if device is not None:
+        torch.cuda.set_device(device)
         return torch.device(device)
     nb_gpu = torch.cuda.device_count()
     if nb_gpu == 1:
+        torch.cuda.set_device("cuda")
         return torch.device("cuda")
     for gpu in range(nb_gpu):
         if torch.cuda.memory_usage(gpu) == 0:

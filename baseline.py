@@ -83,7 +83,7 @@ def tonumpy(str_dists: pandas.Series) -> numpy.ndarray:
 def main():
     # Read command line arguments
     args = parse_args()
-    artemis = pandas.read_csv(args.src)[:150]
+    artemis = pandas.read_csv(args.src)
     loss = KLDivLoss(reduction='batchmean') if args.loss == "kldiv" else emd
 
     # Experiment environment: metrics, logger, ground-truth...
