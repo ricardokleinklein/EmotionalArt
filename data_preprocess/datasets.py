@@ -3,8 +3,8 @@ from torch.utils.data import DataLoader
 from PIL import Image
 from nltk.tokenize import sent_tokenize
 from transformers import BertTokenizer, BatchEncoding
-from transformers import CLIPFeatureExtractor
-from typing import Tuple, Dict, List, Union, Any
+from transformers import CLIPFeatureExtractor, CLIPProcessor
+from typing import Tuple, Dict, List, Union, Any, Optional
 
 import transformers
 import torch
@@ -19,7 +19,6 @@ def multisentence_collate(data):
 
 
 class SentencesDataset(Dataset):
-
     default_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
     def __init__(self,
@@ -71,7 +70,6 @@ class SentencesDataset(Dataset):
 
 
 class ImageDataset(Dataset):
-
     default = CLIPFeatureExtractor.from_pretrained(
         "openai/clip-vit-base-patch32"
     )
@@ -125,3 +123,50 @@ class ImageDataset(Dataset):
         shuffle = True if phase == "train" else False
         return DataLoader(dataset=self, batch_size=batch_size,
                           shuffle=shuffle, num_workers=num_workers)
+
+
+class MultimodalDataset(Dataset):
+    default = CLIPProcessor.from_pretrained(
+        "openai/clip-vit-base-patch32"
+    )
+
+    def __init__(self, texts: Union[numpy.ndarray, pandas.Series],
+                 image_paths: Union[numpy.ndarray, pandas.Series],
+                 scores: Union[numpy.ndarray, List],
+                 processor: Optional[transformers.ProcessorMixin] = None
+                 ) -> None:
+        self.targets = scores
+        self.processor = self.default if not processor else processor
+
+        if isinstance(texts, pandas.Series):
+            texts = texts.values
+        if isinstance(image_paths, pandas.Series):
+            image_paths = image_paths.values
+        self.texts = texts
+        self.img_paths = image_paths
+
+    def __len__(self) -> int:
+        return len(self.targets)
+
+    def __getitem__(self, idx) -> Tuple[Dict, torch.Tensor]:
+        sentences = sent_tokenize(self.texts[idx])
+        image = Image.open(self.img_paths[idx])
+        target = torch.tensor(self.targets[idx]).float()
+        inputs = self.processor(text=sentences, images=image,
+                                return_tensors="pt", padding="max_length",
+                                truncation=True)
+        return inputs, target
+
+    def load(self, phase: str = 'train', batch_size: int = 32,
+             num_workers: int = 0) -> torch.utils.data.DataLoader:
+        """Retrieve a DataLoader to ease the pipeline.
+
+        Args:
+            phase: Whether it's train or test.
+            batch_size: Samples per batch.
+            num_workers: Cores to use.
+
+        Returns:
+            an iterable torch DataLoader.
+        """
+        pass
