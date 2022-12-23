@@ -11,13 +11,14 @@ Optional arguments:
     --img_root      Local directory where images are saved
     -h, --help      Show this help message and exit
 
-TODO: sent_tokenizer. Now some sentences are not correctly split
 """
+import re
 import argparse
 import pandas
 
 from tqdm import tqdm
 from pathlib import Path
+from nltk.tokenize import sent_tokenize
 
 
 ART_DIR = "/mnt/HDD/DATA/SEMART/Images"
@@ -54,7 +55,7 @@ def main() -> None:
         ignore_index=True)
     dataset['localpath'] = dataset["IMAGE_FILE"].apply(
         lambda s: img_root / s)
-    dataset = dataset[dataset['localpath'].map(lambda s: s.exists())]
+    # dataset = dataset[dataset['localpath'].map(lambda s: s.exists())]
     dataset.sort_values(by="TITLE", inplace=True)
 
     if args.clip:
@@ -62,7 +63,10 @@ def main() -> None:
         nb = len(dataset)
         for i in tqdm(range(nb), total=nb, disable=args.quiet):
             painting = dataset.iloc[i]
-            sentences = painting["DESCRIPTION"].split('.')
+            raw_text = painting["DESCRIPTION"]
+            sentences = sent_tokenize(
+                re.sub(r'(?<=[.,])(?=[^\s])', r' ', raw_text)
+            )
             for sentence in sentences:
                 for key in list(dataset_):
                     if key == "DESCRIPTION":
