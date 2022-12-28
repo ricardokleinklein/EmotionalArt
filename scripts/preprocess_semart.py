@@ -55,7 +55,7 @@ def main() -> None:
         ignore_index=True)
     dataset['localpath'] = dataset["IMAGE_FILE"].apply(
         lambda s: img_root / s)
-    # dataset = dataset[dataset['localpath'].map(lambda s: s.exists())]
+    dataset = dataset[dataset['localpath'].map(lambda s: s.exists())]
     dataset.sort_values(by="TITLE", inplace=True)
 
     if args.clip:

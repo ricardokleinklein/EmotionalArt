@@ -31,9 +31,9 @@ class Trainer:
     def __init__(self,
                  model: nn.Module,
                  loss_fn: Union[Callable, nn.Module],
-                 metrics: Metrics,
                  monitor_metric: str,
                  device: torch.device,
+                 metrics: Optional[Metrics] = None,
                  learning_rate: float = 1e-5,
                  logger: Optional[loggers.baselog.Logger] = None,
                  *args, **kwargs):
@@ -203,12 +203,14 @@ class Trainer:
             self.best_model(batch_inputs)
         batch_loss = self.loss_fn(
             target=torch.squeeze(batch_labels),
-            input=torch.squeeze(batch_preds)
+            # input=torch.squeeze(batch_preds)
+            input=batch_preds
         )
         if step != 'eval':
             batch_loss.backward()
             self.optimizer.step()
-        return batch_preds.detach(), batch_loss.detach().item()
+        return (batch_preds[0].detach(), batch_preds[1].detach()), batch_loss.detach().item()
+        # return batch_preds.detach(), batch_loss.detach().item()
 
     def assess(self, data_loader: Loader, predictions: Tensor) -> \
             Optional[Dict]:

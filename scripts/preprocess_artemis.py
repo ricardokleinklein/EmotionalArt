@@ -83,7 +83,7 @@ def main() -> None:
     dataset['localpath'] = dataset.apply(
         lambda x: absolute_local_path(img_root, x.art_style, x.painting),
         axis=1)     # Obtain image paths in the local system
-    dataset = dataset[dataset['localpath'].map(lambda s: s.exists())]
+    # dataset = dataset[dataset['localpath'].map(lambda s: s.exists())]
 
     # Append a dot to the end of a sentence if it doesn't have one
     dataset['utterance'] = dataset['utterance_spelled'].apply(
@@ -104,7 +104,7 @@ def main() -> None:
         if len(subset) < 2:
             subset = pandas.concat([subset, subset])
 
-        merged_utterances.append(''.join(subset['utterance']))
+        merged_utterances.append(' '.join(subset['utterance']))
         emotion_count = label_bin.transform(subset['emotion']).sum(axis=0)
         most_emotion.append(numpy.argmax(emotion_count))
         emotion_dists.append(emotion_count / emotion_count.sum())

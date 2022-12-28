@@ -7,8 +7,7 @@ import torch.nn as nn
 
 from transformers import BertModel, CLIPModel, GPT2Model
 from transformers import PreTrainedTokenizer
-from typing import Dict
-
+from typing import Dict, Tuple, Any
 
 Tensor = torch.Tensor
 Tokenizer = PreTrainedTokenizer
@@ -33,6 +32,7 @@ class CustomTextualCLIP(nn.Module):
         self.multiple = multisentence
         self.base_text_clip = clip.text_model
         self.base_text_proj = clip.text_projection
+        self.output_embed = True if num_classes < 1 else False
         if finetune:
             for layer in [self.base_text_clip, self.base_text_proj]:
                 for param in layer.parameters():
@@ -45,6 +45,8 @@ class CustomTextualCLIP(nn.Module):
             z = self._forward_multiple(x)
         else:
             z = self._simple(x)
+        if self.output_embed:
+            return z
         z = self.classifier(z)
         return nn.functional.log_softmax(z, dim=1)
 
@@ -54,6 +56,7 @@ class CustomTextualCLIP(nn.Module):
         return torch.stack(z)
 
     def _simple(self, x: Dict) -> Tensor:
+        # x = {k: x[k].squeeze() for k in x}
         z = self.base_text_clip(**x).pooler_output
         return self.base_text_proj(z)
 
@@ -85,6 +88,7 @@ class CustomVisualCLIP(nn.Module):
         clip = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
         self.base_visual_clip = clip.vision_model
         self.base_visual_proj = clip.visual_projection
+        self.output_embed = True if num_classes < 1 else False
         if finetune:
             for layer in [self.base_visual_clip, self.base_visual_proj]:
                 for param in layer.parameters():
@@ -104,5 +108,34 @@ class CustomVisualCLIP(nn.Module):
         x['pixel_values'] = x['pixel_values'].squeeze()
         z = self.base_visual_clip(**x).pooler_output
         z = self.base_visual_proj(z)
+        if self.output_embed:
+            return z
         z = self.classifier(z)
         return nn.functional.log_softmax(z, dim=1)
+
+
+class CLIP(nn.Module):
+
+    def __init__(self):
+        super(CLIP, self).__init__()
+        self.vision = CustomVisualCLIP(num_classes=0, finetune=False)
+        self.textual = CustomTextualCLIP(num_classes=0, finetune=False,
+                                         multisentence=False)
+
+        # https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPConfig.logit_scale_init_value
+        self.logit_scale = nn.Parameter(torch.ones([]) * 2.6592)
+
+    def forward(self, x: Dict) -> Tuple[torch.Tensor, torch.Tensor]:
+        z_vision = self.vision(x[0])
+        z_textual = self.textual(x[1])
+
+        # normalized features
+        image_embeds = z_vision / z_vision.norm(p=2, dim=-1, keepdim=True)
+        text_embeds = z_textual / z_textual.norm(p=2, dim=-1, keepdim=True)
+
+        # cosine similarity as logits
+        logit_scale = self.logit_scale.exp()
+        logits_per_text = torch.matmul(text_embeds, image_embeds.t()) * logit_scale
+        logits_per_image = logits_per_text.t()
+
+        return logits_per_image, logits_per_text
