@@ -1,5 +1,8 @@
 """
 Transformer models used by the interfase of HuggingFace.
+
+TODO: Review how it works with common loss functions now that the trainer
+class squeezing of predictions and labels has been removed.
 """
 
 import torch
@@ -125,7 +128,7 @@ class CLIP(nn.Module):
         # https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPConfig.logit_scale_init_value
         self.logit_scale = nn.Parameter(torch.ones([]) * 2.6592)
 
-    def forward(self, x: Dict) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: Dict) -> torch.Tensor:
         z_vision = self.vision(x[0])
         z_textual = self.textual(x[1])
 
@@ -138,4 +141,4 @@ class CLIP(nn.Module):
         logits_per_text = torch.matmul(text_embeds, image_embeds.t()) * logit_scale
         logits_per_image = logits_per_text.t()
 
-        return logits_per_image, logits_per_text
+        return torch.stack([logits_per_image, logits_per_text], dim=0)

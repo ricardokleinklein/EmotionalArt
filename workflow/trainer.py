@@ -7,7 +7,6 @@ training and testing utilities, so it doesn't matter whether you're just
 looking for a system to evaluate your pretrained model, go through the
 Trainer class for a smooth experience.
 
-TODO: Swap to a cleaner LOG system.
 TODO: Enable changing the optimizer.
 """
 import copy
@@ -35,8 +34,8 @@ class Trainer:
                  device: torch.device,
                  metrics: Optional[Metrics] = None,
                  learning_rate: float = 1e-5,
-                 logger: Optional[loggers.baselog.Logger] = None,
-                 *args, **kwargs):
+                 multimodal: Optional[bool] = False,
+                 logger: Optional[loggers.baselog.Logger] = None):
         """ Systematize a typical lifecycle of a machine learning
         pipeline, including training, validating and testing one.
 
@@ -57,6 +56,7 @@ class Trainer:
         self.device = device
         self.logger = logger
 
+        self.agg_fn = torch.cat if not multimodal else torch.stack
         self.best_model = copy.deepcopy(model)
         self.best_loss = 0
         self.optimizer = optim.AdamW(self.model.parameters(), lr=learning_rate)
@@ -144,7 +144,7 @@ class Trainer:
                                        use_best=False)
             predictions.append(batch_preds)
             loss_sum += batch_loss
-        return torch.cat(predictions, axis=0), loss_sum / b
+        return self.agg_fn(predictions, axis=0), loss_sum / b
 
     def eval(self, data_loader: Loader, use_best: bool = False,
              verbose: bool = True) -> Tuple[Tensor, float]:
@@ -172,8 +172,7 @@ class Trainer:
                                                      use_best=use_best)
                 predictions.append(batch_preds)
                 loss_sum += batch_loss
-        predictions = torch.cat(predictions, axis=0)
-        return predictions, loss_sum / b
+        return self.agg_fn(predictions, axis=0), loss_sum / b
 
     def _step(self, data: Tuple, step: str = 'eval',
               use_best: bool = False) -> Tuple[Tensor, float]:
@@ -203,14 +202,12 @@ class Trainer:
             self.best_model(batch_inputs)
         batch_loss = self.loss_fn(
             target=torch.squeeze(batch_labels),
-            # input=torch.squeeze(batch_preds)
             input=batch_preds
         )
         if step != 'eval':
             batch_loss.backward()
             self.optimizer.step()
-        return (batch_preds[0].detach(), batch_preds[1].detach()), batch_loss.detach().item()
-        # return batch_preds.detach(), batch_loss.detach().item()
+        return batch_preds.detach(), batch_loss.detach().item()
 
     def assess(self, data_loader: Loader, predictions: Tensor) -> \
             Optional[Dict]:

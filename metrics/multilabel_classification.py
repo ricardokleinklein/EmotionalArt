@@ -46,6 +46,53 @@ def emd(target: torch.Tensor, input: torch.Tensor,
                                  dim=-1))
 
 
+class BatchWiseClsMetrics(Metrics):
+    metrics = {
+        'text_accuracy': {'fn': accuracy_score,
+                     'value': 0,
+                     'mode': 'max'},
+        'vision_accuracy': {'fn': accuracy_score,
+                     'value': 0,
+                     'mode': 'max'}
+    }
+
+    def __init__(self, additional_metrics: Dict = None) -> None:
+        """ Common metrics used to assess performance in multilabel,
+        classification problems when the predictions can only be understood
+        at a batch level. For instance, because the labels are relative to
+        batch position.
+
+        Note: Currently implemented only for 2-modal cases. Further cases
+        should modify the compute method.
+
+        Args:
+            additional_metrics: Pairs of name: computing_function of other
+        """
+        super(BatchWiseClsMetrics, self).__init__(additional_metrics)
+
+    def compute(self, y: Union[torch.Tensor, Array, Series],
+                y_hat: Union[torch.Tensor, Array, Series]) -> Dict:
+        """Run through the metrics considered and compute their values
+        given a set of reference values and a set of predictions.
+
+        Args:
+            y: Not used.
+            y_hat: (NB_BATCHS, BS, BS) Predicted values per batch
+
+        Returns:
+            Value of the metrics considered.
+        """
+        size = y_hat.shape[-1]
+        gt = torch.arange(size).cpu().numpy()
+        metrics_ = dict()
+        for batch in y_hat:
+            preds_vision = torch.argmax(batch[1], dim=0).cpu().numpy()
+            preds_text = torch.argmax(batch[1], dim=0).cpu().numpy()
+            metrics_["vision_accuracy"] = accuracy_score(gt, preds_vision)
+            metrics_["text_accuracy"] = accuracy_score(gt, preds_text)
+        return metrics_
+
+
 class MultiLabelClsMetrics(Metrics):
 
     metrics = {

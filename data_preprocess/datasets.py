@@ -256,14 +256,15 @@ class CLIPDataset(Dataset):
     def __len__(self) -> int:
         return len(self.captions)
 
-    def __getitem__(self, idx: int) -> Tuple[BatchEncoding, Tensor]:
-        # img_path = self.image_paths[idx]
-        img_path = "/Users/ricardokleinlein/Desktop/Thesis/EmotionalArt/DATA" \
-                   "/artemis/wikiart/Baroque/adriaen-brouwer_in-the-tavern-1.jpg"
+    def __getitem__(self, idx: int) -> Tuple[
+        Tuple[Dict[str, Any], dict], Tensor]:
+        img_path = self.image_paths[idx]
+        # img_path = "/Users/ricardokleinlein/Desktop/Thesis/EmotionalArt/DATA" \
+        #            "/artemis/wikiart/Baroque/adriaen-brouwer_in-the-tavern-1.jpg"
         image = Image.open(img_path).convert("RGB")
         caption = self.captions[idx]
-        # label = torch.tensor(self.path2label[img_path])
-        label = torch.tensor(0)
+        label = torch.tensor(self.path2label[img_path])
+        # label = torch.tensor(0)
         inputs = self.processor(text=caption, images=image,
                                 return_tensors="pt", padding="max_length",
                                 truncation=True)
