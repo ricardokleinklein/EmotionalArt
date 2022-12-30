@@ -82,7 +82,7 @@ def main() -> None:
     if not file.exists():
         raise IOError(f"Artemis file not found in {file}")
 
-    dataset = pandas.read_csv(file)[:100]
+    dataset = pandas.read_csv(file)
 
     # Check all artworks are available locally
     dataset['localpath'] = dataset.apply(

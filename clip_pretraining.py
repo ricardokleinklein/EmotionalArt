@@ -67,7 +67,7 @@ class ContrastiveLoss(nn.Module):
 def main():
     # Read command line arguments
     args = parse_args()
-    dataset = pandas.read_csv(args.src)[:15]
+    dataset = pandas.read_csv(args.src)
     loss = ContrastiveLoss(args.batch, args.device)
     metrics = BatchWiseClsMetrics()
     logger = Logger(log_dir=args.log_dir)
@@ -93,9 +93,13 @@ def main():
     trainer = Trainer(model=model, loss_fn=loss, metrics=metrics,
                       monitor_metric=args.monitor, multimodal=True,
                       device=args.device, learning_rate=args.lr, logger=logger)
-    record = trainer.fit(data_loader=train_loader,
+    record = trainer.fit(data_loader=train_loader, val_loader=test_loader,
                          max_epochs=args.epochs, patience=args.patience,
                          tol_eps=args.eps)
+    if args.save:
+        logger("Saving model's state dict in disk")
+        trainer.save(logger.log_dir / "model_state_dict.pt")
+
     logger.close()
 
 
