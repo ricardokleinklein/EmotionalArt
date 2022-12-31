@@ -8,6 +8,7 @@ Positional arguments:
     dst             Location to save the newly created file
 
 Optional arguments:
+    --add-field     Fields to add as sentences
     --img_root      Local directory where images are saved
     -h, --help      Show this help message and exit
 
@@ -16,9 +17,8 @@ import re
 import argparse
 import pandas
 
-from tqdm import tqdm
+from unidecode import unidecode
 from pathlib import Path
-from nltk.tokenize import sent_tokenize
 
 
 ART_DIR = "/mnt/HDD/DATA/SEMART/Images"
@@ -30,9 +30,8 @@ def parse_args() -> argparse.Namespace:
                                      formatter_class=formatter)
     parser.add_argument("src", type=str, help="Original raw data directory")
     parser.add_argument("dst", type=str, help="Location to save new file")
-    parser.add_argument("--clip", action="store_true",
-                        help="Preprocess to make it simpler for a "
-                             "CLIP-schemed training.")
+    parser.add_argument("--add-field", nargs='+', default=None,
+                        help="Extra metada to add as part of the description")
     parser.add_argument("--img_root", type=str,
                         help="Image local directory", default=ART_DIR)
     parser.add_argument("-q", "--quiet", help="Hide messages",
@@ -53,27 +52,23 @@ def main() -> None:
         [pandas.read_csv(
             f, sep='\t', encoding="ISO-8859-1") for f in raw_files],
         ignore_index=True)
+    dataset.dropna(subset=["DESCRIPTION"], inplace=True)
     dataset['localpath'] = dataset["IMAGE_FILE"].apply(
         lambda s: img_root / s)
     dataset = dataset[dataset['localpath'].map(lambda s: s.exists())]
     dataset.sort_values(by="TITLE", inplace=True)
 
-    if args.clip:
-        dataset_ = {k: [] for k in list(dataset)}
-        nb = len(dataset)
-        for i in tqdm(range(nb), total=nb, disable=args.quiet):
-            painting = dataset.iloc[i]
-            raw_text = painting["DESCRIPTION"]
-            sentences = sent_tokenize(
-                re.sub(r'(?<=[.,])(?=[^\s])', r' ', raw_text)
-            )
-            for sentence in sentences:
-                for key in list(dataset_):
-                    if key == "DESCRIPTION":
-                        dataset_[key].append(sentence)
-                    else:
-                        dataset_[key].append(painting[key])
-        dataset = pandas.DataFrame(dataset_)
+    # Correct and uniform unicode characters
+    dataset["DESCRIPTION"] = dataset["DESCRIPTION"].apply(
+        lambda s: unidecode(re.sub(r'(?<=[.,])(?=[^\s])', r' ', s)) + '. ')
+    dataset["AUTHOR"] = dataset["AUTHOR"].apply(lambda s: unidecode(s))
+    dataset["TITLE"] = dataset["TITLE"].apply(lambda s: unidecode(s))
+
+    if args.add_field is not None:
+        extra_sentence = dataset[args.add_field].apply(
+            lambda s: ', '.join(s) + ".", axis=1
+        )
+        dataset["DESCRIPTION"] = dataset["DESCRIPTION"] + extra_sentence
 
     dataset.to_csv(savedir, index=False)
 

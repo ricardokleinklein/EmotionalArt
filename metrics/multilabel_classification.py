@@ -47,11 +47,7 @@ def emd(target: torch.Tensor, input: torch.Tensor,
 
 
 class BatchWiseClsMetrics(Metrics):
-    metrics = {
-        'text_accuracy': {'fn': accuracy_score,
-                     'value': 0,
-                     'mode': 'max'},
-        'vision_accuracy': {'fn': accuracy_score,
+    metrics = {'accuracy': {'fn': accuracy_score,
                      'value': 0,
                      'mode': 'max'}
     }
@@ -87,9 +83,8 @@ class BatchWiseClsMetrics(Metrics):
         metrics_ = dict()
         for batch in y_hat:
             preds_vision = torch.argmax(batch[1], dim=0).cpu().numpy()
-            preds_text = torch.argmax(batch[1], dim=0).cpu().numpy()
-            metrics_["vision_accuracy"] = accuracy_score(gt, preds_vision)
-            metrics_["text_accuracy"] = accuracy_score(gt, preds_text)
+            metrics_["accuracy"] = self.metrics['accuracy']['fn'](gt,
+                                                                  preds_vision)
         return metrics_
 
 

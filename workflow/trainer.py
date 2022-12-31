@@ -91,6 +91,10 @@ class Trainer:
             self.metrics.update(metrics_state)
             track = {**track, **{k: [val] for k, val in
                                      metrics_state.items()}}
+        if verbose:
+            fmt = f"Loss: {current_loss}"
+            fmt += f"; Metrics state:{metrics_state}" if self.metrics else ""
+            self.logger(fmt)
         patience_left = patience
         for epoch in range(max_epochs):
             self.logger(f'Epoch {epoch + 1} / {max_epochs}')
