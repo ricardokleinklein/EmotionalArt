@@ -22,7 +22,7 @@ import argparse
 import pandas
 import warnings
 import itertools
-import urllib
+import requests
 
 from PIL import Image
 from unidecode import unidecode
@@ -54,33 +54,28 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-# def download(url: str, dst: Path) -> bool:
-#     """
-#
-#     Args:
-#         url:
-#         dst:
-#
-#     Returns:
-#
-#     """
-#     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X '
-#                              '10_11_5) AppleWebKit/537.36 (KHTML, '
-#                              'like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
-#     response = requests.get(url, headers=headers)
-#     if response.ok:
-#         open(dst, "wb").write(response.content)
-#     return response.ok
-
-
 def download(url: str, dst: Path) -> bool:
-    response, headers = urllib.request.urlretrieve(url, dst)
+    """
+
+    Args:
+        url:
+        dst:
+
+    Returns:
+
+    """
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X '
+                             '10_11_5) AppleWebKit/537.36 (KHTML, '
+                             'like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
+    response = requests.get(url, headers=headers)
+    if response.ok:
+        open(dst, "wb").write(response.content)
     image = Image.open(dst)
     data = list(image.getdata())
     image_without_exif = Image.new(image.mode, image.size)
     image_without_exif.putdata(data)
     image_without_exif.save(dst)
-    return response is None
+    return response.ok
 
 
 def pick_cc(x: pandas.Series, cols: List[str]) -> str:
