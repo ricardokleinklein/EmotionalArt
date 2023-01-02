@@ -14,6 +14,11 @@ import numpy
 import pandas
 
 
+# https://stackoverflow.com/questions/51152059/pillow-in-python-wont-let-me
+# -open-image-exceeds-limit
+Image.MAX_IMAGE_PIXELS = None
+
+
 def multisentence_collate(data):
     target = torch.stack([x[1] for x in data])
     sentence_batch = [x[0] for x in data]
