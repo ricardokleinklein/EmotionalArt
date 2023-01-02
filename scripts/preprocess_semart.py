@@ -45,7 +45,7 @@ def main() -> None:
     savedir = Path(args.dst)
     img_root = Path(args.img_root)
 
-    raw_files = list(rootdir.glob("*.csv"))
+    raw_files = list(rootdir.glob("semart*.csv"))
     if not rootdir.exists() or len(raw_files) == 0:
         raise IOError(f"SemArt files not found in {rootdir}")
     dataset = pandas.concat(
@@ -69,7 +69,8 @@ def main() -> None:
             lambda s: ', '.join(s) + ".", axis=1
         )
         dataset["DESCRIPTION"] = dataset["DESCRIPTION"] + extra_sentence
-
+    dataset["DESCRIPTION"] = dataset["DESCRIPTION"].apply(
+        lambda s: re.sub('"','',s).lower())
     dataset.to_csv(savedir, index=False)
 
 
