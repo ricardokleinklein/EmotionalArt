@@ -48,10 +48,14 @@ def main() -> None:
     raw_files = list(rootdir.glob("semart*.csv"))
     if not rootdir.exists() or len(raw_files) == 0:
         raise IOError(f"SemArt files not found in {rootdir}")
-    dataset = pandas.concat(
-        [pandas.read_csv(
-            f, sep='\t', encoding="ISO-8859-1") for f in raw_files],
-        ignore_index=True)
+    dataframes = [pandas.read_csv(f, sep='\t',encoding="ISO-8859-1") for f in raw_files]
+    partitions = []
+    partitions.extend(['train'] * len(dataframes[0]))
+    partitions.extend(['val'] * len(dataframes[1]))
+    partitions.extend(['test'] * len(dataframes[2]))
+
+    dataset = pandas.concat(dataframes, ignore_index=True)
+    dataset['split'] = partitions
     dataset.dropna(subset=["DESCRIPTION"], inplace=True)
     dataset['localpath'] = dataset["IMAGE_FILE"].apply(
         lambda s: img_root / s)
