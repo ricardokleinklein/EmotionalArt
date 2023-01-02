@@ -29,7 +29,7 @@ from unidecode import unidecode
 from pathlib import Path
 from tqdm import tqdm
 
-from typing import List
+from typing import List, Tuple
 
 
 # https://stackoverflow.com/questions/51152059/pillow-in-python-wont-let-me
@@ -52,12 +52,14 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--artdir", type=str, default=ART_DIR,
                         help="Image local directory")
+    parser.add_argument("-s", "--max-size", type=int, nargs='+', required=True,
+                        help="Maximum image width (1) and/or height (2)")
     parser.add_argument("-d", "--download", help="Force image downloading",
                         action="store_true")
     return parser.parse_args()
 
 
-def download(url: str, dst: Path) -> bool:
+def download(url: str, dst: Path, size=Tuple[int, int]) -> bool:
     """
 
     Args:
@@ -77,6 +79,7 @@ def download(url: str, dst: Path) -> bool:
         data = list(image.getdata())
         image_without_exif = Image.new(image.mode, image.size)
         image_without_exif.putdata(data)
+        image_without_exif.thumbnail(size, reducing_gap=2.0)
         image_without_exif.save(dst)
     return response.ok
 
@@ -89,17 +92,19 @@ def pick_cc(x: pandas.Series, cols: List[str]) -> str:
 
 def main():
     args = parse_args()
+    print(args)
     dataset = pandas.read_json(args.src).transpose()
     dataset['title'] = dataset['title'].apply(lambda s: unidecode(s).lower())
 
     # Download images if not present, or force downloading again if flag
     artdir = Path(args.artdir)
+    max_size = tuple(args.max_size)
     if not artdir.exists() or args.download:
         artdir.mkdir(parents=True, exist_ok=True)
         titles = dataset['title'].values
         urls = dataset['img_url'].values
         for i, (title, url) in tqdm(enumerate(zip(titles, urls)), total=len(urls)):
-            status = download(url, artdir / (title + '.jpg'))
+            status = download(url, artdir / (title + '.jpg'), max_size)
             if not status:
                 warnings.warn(f"Could not download {title} from {url}",
                               RuntimeWarning)
