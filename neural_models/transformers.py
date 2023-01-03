@@ -119,11 +119,12 @@ class CustomVisualCLIP(nn.Module):
 
 class CLIP(nn.Module):
 
-    def __init__(self):
+    def __init__(self, output_embed: bool = False):
         super(CLIP, self).__init__()
         self.vision = CustomVisualCLIP(num_classes=0, finetune=False)
         self.textual = CustomTextualCLIP(num_classes=0, finetune=False,
                                          multisentence=False)
+        self.output_embed = output_embed
 
         # https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPConfig.logit_scale_init_value
         self.logit_scale = nn.Parameter(torch.ones([]) * 2.6592)
@@ -135,6 +136,8 @@ class CLIP(nn.Module):
         # normalized features
         image_embeds = z_vision / z_vision.norm(p=2, dim=-1, keepdim=True)
         text_embeds = z_textual / z_textual.norm(p=2, dim=-1, keepdim=True)
+        if self.output_embed:
+            return torch.stack((image_embeds, text_embeds), dim=0)
 
         # cosine similarity as logits
         logit_scale = self.logit_scale.exp()

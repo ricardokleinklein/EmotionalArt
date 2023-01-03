@@ -264,12 +264,10 @@ class CLIPDataset(Dataset):
     def __getitem__(self, idx: int) -> Tuple[
         Tuple[Dict[str, Any], dict], Tensor]:
         img_path = self.image_paths[idx]
-        # img_path = "/Users/ricardokleinlein/Desktop/Thesis/EmotionalArt/DATA" \
-        #            "/artemis/wikiart/Baroque/adriaen-brouwer_in-the-tavern-1.jpg"
         image = Image.open(img_path).convert("RGB")
         caption = self.captions[idx]
-        label = torch.tensor(self.path2label[img_path])
-        # label = torch.tensor(0)
+        # label = torch.tensor(self.path2label[img_path])
+        label = torch.tensor(idx)
         inputs = self.processor(text=caption, images=image,
                                 return_tensors="pt", padding="max_length",
                                 truncation=True)
@@ -290,7 +288,8 @@ class CLIPDataset(Dataset):
         Returns:
             an iterable torch DataLoader.
         """
-        labels = torch.tensor(list(range(len(self.image_paths))))
+        labels = torch.tensor([self.path2label[p] for p in self.image_paths])
+        # labels = torch.tensor(list(range(len(self.image_paths))))
         sampler = BalancedBatchSampler(labels, batch_size, 1)
         return DataLoader(dataset=self,  num_workers=num_workers,
                           batch_sampler=sampler)
