@@ -23,6 +23,7 @@ import pandas
 import warnings
 import itertools
 import requests
+import PIL
 
 from PIL import Image
 from unidecode import unidecode
@@ -34,7 +35,7 @@ from typing import List, Tuple
 
 # https://stackoverflow.com/questions/51152059/pillow-in-python-wont-let-me
 # -open-image-exceeds-limit
-Image.MAX_IMAGE_PIXELS = None
+#Image.MAX_IMAGE_PIXELS = None
 ART_DIR = "/mnt/HDD/DATA/Artpedia/images"
 
 
@@ -74,8 +75,11 @@ def download(url: str, dst: Path, size=Tuple[int, int]) -> bool:
                              'like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
     response = requests.get(url, headers=headers)
     if response.ok:
-        open(dst, "wb").write(response.content)
-        image = Image.open(dst).convert("RGB")
+        try:
+            open(dst, "wb").write(response.content)
+            image = Image.open(dst).convert("RGB")
+        except PIL.Image.DecompressionBombError:
+            return False
         data = list(image.getdata())
         image_without_exif = Image.new(image.mode, image.size)
         image_without_exif.putdata(data)
