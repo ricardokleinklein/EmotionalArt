@@ -4,6 +4,7 @@
 import argparse
 import torch
 import pandas
+import logging
 import torch.nn as nn
 
 from data_preprocess.datasets import CLIPDataset
@@ -11,6 +12,10 @@ from neural_models.transformers import CLIP
 from metrics.multilabel_classification import BatchWiseClsMetrics
 from workflow.trainer import Trainer
 from loggers.baselog import Logger
+
+
+# https://github.com/camptocamp/pytest-odoo/issues/15
+logging.getLogger('PIL').setLevel(logging.WARNING)
 
 
 def parse_args() -> argparse.Namespace:
@@ -83,10 +88,11 @@ def main():
     logger(f"\n\tNb train samples: {len(train_data)}\n\tNb eval samples: "
            f"{len(test_data)}")
 
-    train = CLIPDataset(train_data, text_col="utterance",
+    train = CLIPDataset(train_data, text_col="description",
                         image_col="localpath")
     train_loader = train.load("train", batch_size=args.batch)
-    test = CLIPDataset(test_data, text_col="utterance", image_col="localpath")
+    test = CLIPDataset(test_data, text_col="description",
+                       image_col="localpath")
     test_loader = test.load("test", batch_size=args.batch)
     model = CLIP()
 

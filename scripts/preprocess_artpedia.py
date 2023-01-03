@@ -24,6 +24,7 @@ import warnings
 import itertools
 import requests
 import PIL
+import shutil
 
 from PIL import Image
 from unidecode import unidecode
@@ -73,18 +74,19 @@ def download(url: str, dst: Path, size=Tuple[int, int]) -> bool:
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X '
                              '10_11_5) AppleWebKit/537.36 (KHTML, '
                              'like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, stream=True)
     if response.ok:
         try:
-            open(dst, "wb").write(response.content)
+            with open(dst, "wb") as f:
+                shutil.copyfileobj(response.raw, f)
             image = Image.open(dst).convert("RGB")
+            data = list(image.getdata())
+            image_without_exif = Image.new("RGB", image.size)
+            image_without_exif.putdata(data)
+            image_without_exif.thumbnail(size, reducing_gap=2.0)
+            image_without_exif.save(dst)
         except PIL.Image.DecompressionBombError:
             return False
-        data = list(image.getdata())
-        image_without_exif = Image.new(image.mode, image.size)
-        image_without_exif.putdata(data)
-        image_without_exif.thumbnail(size, reducing_gap=2.0)
-        image_without_exif.save(dst)
     return response.ok
 
 
@@ -96,8 +98,7 @@ def pick_cc(x: pandas.Series, cols: List[str]) -> str:
 
 def main():
     args = parse_args()
-    print(args)
-    dataset = pandas.read_json(args.src).transpose()
+    dataset = pandas.read_json(args.src).transpose()[:100]
     dataset['title'] = dataset['title'].apply(lambda s: unidecode(s).lower())
 
     # Download images if not present, or force downloading again if flag
@@ -108,14 +109,14 @@ def main():
         titles = dataset['title'].values
         urls = dataset['img_url'].values
         for i, (title, url) in tqdm(enumerate(zip(titles, urls)), total=len(urls)):
-            status = download(url, artdir / (title + '.jpg'), max_size)
+            status = download(url, artdir / (title + '.png'), max_size)
             if not status:
                 warnings.warn(f"Could not download {title} from {url}",
                               RuntimeWarning)
 
     # Assess availability and keep only downloaded ones
     dataset['localpath'] = dataset["title"].apply(
-        lambda s: artdir / (s + '.jpg'))
+        lambda s: artdir / (s + '.png'))
     dataset = dataset[dataset['localpath'].map(lambda s: s.exists())]
 
     # Select captions source
