@@ -1,14 +1,14 @@
-""" Baseline
+""" Learn Emotions
 
-Experiments performed to assess our baseline based on the different branches
-of a pretrained CLIP model.
+In this script we finetune
 
 Positional arguments:
     src                     Dataset file.
+    branch                  Data type ["text", "vision"]
+    pretrained              Path to pretrained model state dict
 
 Optional arguments:
     --val                   Whether to train according to val error
-    -f, --finetune          If set, train only last layer
     -m, --monitor           Metric to assess the progress of the training
     -e, --epochs            Epochs to train for
     -p, --patience          Epochs to wait before early-stopping
@@ -20,15 +20,19 @@ Optional arguments:
     -s, --save              Whether to save trained models afterwards
     --seed                  Random seed value
     -- device               Device to use. Default: cuda
-
 """
 import argparse
 import numpy
 import pandas
+import pathlib
+import torch
+
+from collections import OrderedDict
+from torch.nn import Module
 from torch.nn import KLDivLoss
 from data_preprocess.tokenizers import BPETokenizer
 from data_preprocess.datasets import SentencesDataset, ImageDataset
-from neural_models.transformers import CustomTextualCLIP, CustomVisualCLIP
+from neural_models.transformers import *
 from metrics.multilabel_classification import DistributionDistanceMetrics
 from metrics.multilabel_classification import emd
 from workflow.trainer import Trainer
@@ -40,9 +44,8 @@ BRANCH_CONFIG = {'text': {'reader': SentencesDataset,
                           'processor': BPETokenizer('clip', seq_len=77)},
                  'vision': {'reader': ImageDataset,
                             'feat_col': 'localpath',
-                            'processor': None},
-                 'late': None,
-                 'align': None}
+                            'processor': None}
+                 }
 
 
 def parse_args() -> argparse.Namespace:
@@ -51,12 +54,12 @@ def parse_args() -> argparse.Namespace:
                                      formatter_class=formatter)
     parser.add_argument("src", type=str, help="Original Artemis CSV")
     parser.add_argument("branch", type=str, default="vision",
-                        choices=["text", "vision", "late", "align"],
+                        choices=["text", "vision"],
                         help="Branch to experiment with, or fusion style")
+    parser.add_argument("pretrained", type=str,
+                        help="Path to pretrained weights")
     parser.add_argument("--val", action="store_true",
                         help="If set, evaluate over val data. test otherwise")
-    parser.add_argument("-f", "--finetune", action="store_true",
-                        help="If True, train only classification layer(s)")
     parser.add_argument("-m", "--monitor", type=str, default="loss",
                         help="Metric to monitor during training")
     parser.add_argument("-e", "--epochs", type=int, default=500,
@@ -87,6 +90,51 @@ def tonumpy(str_dists: pandas.Series) -> numpy.ndarray:
     """
     return numpy.array([
         numpy.fromstring(s[1:-1], dtype=float, sep=' ') for s in str_dists])
+
+
+def from_pretrained(path_to_pretrained: pathlib.Path,
+                    branch: str,
+                    num_classes: int,
+                    device: str) -> Module:
+    """ Perform our custom loading of a branch from a pretrained CLIP state
+    dict.
+
+    Args:
+        path_to_pretrained: Path to trained model's state dict
+        branch:
+        num_classes: Renewed final layer output size
+        device: Which device to state_dict to
+
+    Returns:
+        a branch of a CLIP model whose weigths are retrieved from a
+        checkpoint but for the final layer.
+    """
+    # read pretrained state dict
+    pretrained_state_dict = torch.load(path_to_pretrained,
+                                       map_location=torch.device(device))
+    full_clip = CLIP()
+    full_clip.load_state_dict(pretrained_state_dict, strict=True)
+    branch_only = full_clip.__getattr__(branch)
+
+    # replace last layer (classifier)
+    prev_layer = "base_{}_proj".format(
+        "visual" if branch == "vision" else "textual")
+    branch_only.classifier = nn.Linear(
+        in_features=getattr(branch_only, prev_layer).out_features,
+        out_features=num_classes
+    )
+
+    # freeze all layers but final classifier
+    proj_layer = "base_{}_clip".format(
+        "visual" if branch == "vision" else "textual"
+    )
+    frozen_layers = [l for l in [getattr(branch_only, prev_layer), getattr(
+        branch_only, proj_layer)]]
+    for layer in frozen_layers:
+        for param in layer.parameters():
+            param.requires_grad = False
+    branch_only.output_embed = False
+    return branch_only
 
 
 def main():
@@ -125,17 +173,17 @@ def main():
 
     nb_emotions = len(artemis['emotion_label'].unique())
     logger(f"\n\tNb categories: {nb_emotions}")
-    model_opts = {'text': CustomTextualCLIP(num_classes=nb_emotions,
-                                            finetune=args.finetune,
-                                            multisentence=True),
-                  'vision': CustomVisualCLIP(num_classes=nb_emotions,
-                                             finetune=args.finetune)}
-    trainer = Trainer(model=model_opts[args.branch], loss_fn=loss,
+    model = from_pretrained(args.pretrained,
+                    branch=args.branch, num_classes=nb_emotions,
+                    device=args.device)
+
+    trainer = Trainer(model=model, loss_fn=loss,
                       metrics=metrics, monitor_metric=args.monitor,
                       device=args.device, learning_rate=args.lr, logger=logger)
     trainer.fit(data_loader=train_loader, val_loader=val_loader,
                 max_epochs=args.epochs, patience=args.patience,
                 tol_eps=args.eps)
+
     test_preds, test_loss = trainer.eval(data_loader=test_loader,
                                          use_best=True, verbose=True)
     test_metrics = trainer.assess(data_loader=test_loader,
@@ -144,7 +192,7 @@ def main():
 
     if args.save:
         logger("Saving model's state dict in disk.")
-        trainer.save(logger.log_dir / "model_state_dict.pt")
+        trainer.save(logger.log_dir / "model_state_dict.pt", use_best=True)
     logger.close()
 
 
