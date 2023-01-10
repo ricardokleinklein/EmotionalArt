@@ -52,7 +52,7 @@ def parse_args() -> argparse.Namespace:
                                      formatter_class=formatter)
     parser.add_argument("src", type=str, help="Original Artemis CSV")
     parser.add_argument("branch", type=str, default="vision",
-                        choices=["textual", "vision"],
+                        choices=["text", "vision"],
                         help="Branch to experiment with, or fusion style")
     parser.add_argument("pretrained", type=str,
                         help="Path to pretrained weights")
@@ -108,15 +108,16 @@ def from_pretrained(path_to_pretrained: pathlib.Path,
         checkpoint but for the final layer.
     """
     # read pretrained state dict
+    branch_ = "textual" if branch != "vision" else branch
     pretrained_state_dict = torch.load(path_to_pretrained,
                                        map_location=torch.device(device))
     full_clip = CLIP()
     full_clip.load_state_dict(pretrained_state_dict, strict=True)
-    branch_only = full_clip.__getattr__(branch)
+    branch_only = full_clip.__getattr__(branch_)
 
     # replace last layer (classifier)
     prev_layer = "base_{}_proj".format(
-        "visual" if branch == "vision" else "textual")
+        "visual" if branch == "vision" else "text")
     branch_only.classifier = nn.Linear(
         in_features=getattr(branch_only, prev_layer).out_features,
         out_features=num_classes
@@ -124,7 +125,7 @@ def from_pretrained(path_to_pretrained: pathlib.Path,
 
     # freeze all layers but final classifier
     proj_layer = "base_{}_clip".format(
-        "visual" if branch == "vision" else "textual"
+        "visual" if branch == "vision" else "text"
     )
     frozen_layers = [l for l in [getattr(branch_only, prev_layer), getattr(
         branch_only, proj_layer)]]
