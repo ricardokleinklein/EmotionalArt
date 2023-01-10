@@ -25,9 +25,7 @@ import argparse
 import numpy
 import pandas
 import pathlib
-import torch
 
-from collections import OrderedDict
 from torch.nn import Module
 from torch.nn import KLDivLoss
 from data_preprocess.tokenizers import BPETokenizer
@@ -54,7 +52,7 @@ def parse_args() -> argparse.Namespace:
                                      formatter_class=formatter)
     parser.add_argument("src", type=str, help="Original Artemis CSV")
     parser.add_argument("branch", type=str, default="vision",
-                        choices=["text", "vision"],
+                        choices=["textual", "vision"],
                         help="Branch to experiment with, or fusion style")
     parser.add_argument("pretrained", type=str,
                         help="Path to pretrained weights")
@@ -134,6 +132,8 @@ def from_pretrained(path_to_pretrained: pathlib.Path,
         for param in layer.parameters():
             param.requires_grad = False
     branch_only.output_embed = False
+    if branch != "vision":
+        branch_only.multiple = True # 1+ sentence per sample
     return branch_only
 
 
@@ -180,6 +180,7 @@ def main():
     trainer = Trainer(model=model, loss_fn=loss,
                       metrics=metrics, monitor_metric=args.monitor,
                       device=args.device, learning_rate=args.lr, logger=logger)
+
     trainer.fit(data_loader=train_loader, val_loader=val_loader,
                 max_epochs=args.epochs, patience=args.patience,
                 tol_eps=args.eps)
