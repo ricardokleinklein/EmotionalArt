@@ -25,7 +25,7 @@ Optional arguments:
 import argparse
 import numpy
 import pandas
-from torch.nn import KLDivLoss
+from torch.nn import KLDivLoss, BCELoss
 from data_preprocess.tokenizers import BPETokenizer
 from data_preprocess.datasets import SentencesDataset, ImageDataset
 from neural_models.transformers import CustomTextualCLIP, CustomVisualCLIP
@@ -43,6 +43,11 @@ BRANCH_CONFIG = {'text': {'reader': SentencesDataset,
                             'processor': None},
                  'late': None,
                  'align': None}
+
+
+LOSS = {'kldiv': KLDivLoss(reduction='batchmean'),
+        'emd': emd,
+        'entropy': BCELoss(reduction='mean')}
 
 
 def parse_args() -> argparse.Namespace:
@@ -68,7 +73,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lr", type=float, default=1e-5,
                         help="Initial learning rate")
     parser.add_argument("--loss", type=str, default='kldiv',
-                        choices=['kldiv', 'emd'], help="Loss function")
+                        choices=['kldiv', 'emd', 'entropy'],
+                        help="Loss function")
     parser.add_argument("--eps", type=float, default=0.05,
                         help="Minimum improvement required during training")
     parser.add_argument("--log_dir", type=str, default=None,
@@ -93,7 +99,7 @@ def main():
     # Read command line arguments
     args = parse_args()
     artemis = pandas.read_csv(args.src)
-    loss = KLDivLoss(reduction='batchmean') if args.loss == "kldiv" else emd
+    loss = LOSS[args.loss]
 
     # Experiment environment: metrics, logger, ground-truth...
     metrics = DistributionDistanceMetrics()

@@ -51,7 +51,8 @@ class CustomTextualCLIP(nn.Module):
         if self.output_embed:
             return z
         z = self.classifier(z)
-        return nn.functional.log_softmax(z, dim=1)
+        # return nn.functional.log_softmax(z, dim=1)
+        return nn.functional.softmax(z, dim=1)
 
     def _forward_multiple(self, x: Dict) -> Tensor:
         """Forward pass splitting in different sentences within each sample."""
@@ -114,7 +115,8 @@ class CustomVisualCLIP(nn.Module):
         if self.output_embed:
             return z
         z = self.classifier(z)
-        return nn.functional.log_softmax(z, dim=1)
+        # return nn.functional.log_softmax(z, dim=1)
+        return nn.functional.softmax(z, dim=1)
 
 
 class CLIP(nn.Module):
