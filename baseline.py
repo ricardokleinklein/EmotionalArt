@@ -73,6 +73,8 @@ def parse_args() -> argparse.Namespace:
                         help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-5,
                         help="Initial learning rate")
+    parser.add_argument("-d", "--decay-lr", action="store_true",
+                        help="Implement learning rate decay")
     parser.add_argument("--loss", type=str, default='kldiv',
                         choices=['kldiv', 'emd', 'entropy'],
                         help="Loss function")
@@ -141,7 +143,8 @@ def main():
                                              finetune=args.finetune)}
     trainer = Trainer(model=model_opts[args.branch], loss_fn=loss,
                       metrics=metrics, monitor_metric=args.monitor,
-                      device=args.device, learning_rate=args.lr, logger=logger)
+                      device=args.device, learning_rate=args.lr,
+                      lr_decay=args.decay_lr, logger=logger)
     trainer.fit(data_loader=train_loader, val_loader=val_loader,
                 max_epochs=args.epochs, patience=args.patience,
                 tol_eps=args.eps)

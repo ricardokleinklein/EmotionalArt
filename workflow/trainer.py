@@ -33,7 +33,8 @@ class Trainer:
                  monitor_metric: str,
                  device: torch.device,
                  metrics: Optional[Metrics] = None,
-                 learning_rate: float = 1e-5,
+                 learning_rate: float = 1e-3,
+                 lr_decay: bool = False,
                  multimodal: Optional[bool] = False,
                  logger: Optional[loggers.baselog.Logger] = None):
         """ Systematize a typical lifecycle of a machine learning
@@ -60,6 +61,11 @@ class Trainer:
         self.best_model = copy.deepcopy(model)
         self.best_loss = 0
         self.optimizer = optim.AdamW(self.model.parameters(), lr=learning_rate)
+
+        self.decay = True if lr_decay else False
+        gamma = 0.5 if lr_decay else 1.0
+        self.scheduler = optim.lr_scheduler.StepLR(self.optimizer,
+                                                   step_size=1, gamma=gamma)
 
     def fit(self, data_loader: Loader, val_loader: Optional[Loader] = None,
             max_epochs: int = 500, patience: int = 5, verbose: bool = True,
@@ -97,7 +103,8 @@ class Trainer:
             self.logger(fmt)
         patience_left = patience
         for epoch in range(max_epochs):
-            self.logger(f'Epoch {epoch + 1} / {max_epochs}')
+            self.logger(f'Epoch {epoch + 1} / {max_epochs} [lr = '
+                        f'{self.scheduler.get_last_lr()[0]}]')
             epoch_preds, epoch_loss = self.train_epoch(data_loader,
                                                    verbose=verbose)
             if val_loader is not None:
@@ -148,6 +155,8 @@ class Trainer:
                                        use_best=False)
             predictions.append(batch_preds)
             loss_sum += batch_loss
+        if self.decay:
+            self.scheduler.step()
         return self.agg_fn(predictions, axis=0), loss_sum / b
 
     def eval(self, data_loader: Loader, use_best: bool = False,

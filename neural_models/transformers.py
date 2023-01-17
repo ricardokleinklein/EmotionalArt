@@ -19,7 +19,7 @@ Tokenizer = PreTrainedTokenizer
 class CustomTextualCLIP(nn.Module):
 
     def __init__(self, num_classes: int, finetune: bool = False,
-                 multisentence: bool = False, single_label: bool = False):
+                 multisentence: bool = False):
         """
         Visual half of a CLIP model ready to fine-tune on classification
         and/or regression tasks.
@@ -33,7 +33,6 @@ class CustomTextualCLIP(nn.Module):
         super(CustomTextualCLIP, self).__init__()
         clip = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
         self.multiple = multisentence
-        self.single_label = single_label
         self.base_text_clip = clip.text_model
         self.base_text_proj = clip.text_projection
         self.output_embed = True if num_classes < 1 else False
@@ -52,8 +51,6 @@ class CustomTextualCLIP(nn.Module):
         if self.output_embed:
             return z
         z = self.classifier(z)
-        if self.single_label:
-            return z
         return nn.functional.log_softmax(z, dim=1)
 
     def _forward_multiple(self, x: Dict) -> Tensor:
