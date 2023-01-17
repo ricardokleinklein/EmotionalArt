@@ -8,7 +8,7 @@ class squeezing of predictions and labels has been removed.
 import torch
 import torch.nn as nn
 
-from transformers import BertModel, CLIPModel, GPT2Model
+from transformers import CLIPModel
 from transformers import PreTrainedTokenizer
 from typing import Dict, Tuple, Any
 
@@ -19,7 +19,7 @@ Tokenizer = PreTrainedTokenizer
 class CustomTextualCLIP(nn.Module):
 
     def __init__(self, num_classes: int, finetune: bool = False,
-                 multisentence: bool = False):
+                 multisentence: bool = False, single_label: bool = False):
         """
         Visual half of a CLIP model ready to fine-tune on classification
         and/or regression tasks.
@@ -33,6 +33,7 @@ class CustomTextualCLIP(nn.Module):
         super(CustomTextualCLIP, self).__init__()
         clip = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
         self.multiple = multisentence
+        self.single_label = single_label
         self.base_text_clip = clip.text_model
         self.base_text_proj = clip.text_projection
         self.output_embed = True if num_classes < 1 else False
@@ -51,8 +52,9 @@ class CustomTextualCLIP(nn.Module):
         if self.output_embed:
             return z
         z = self.classifier(z)
-        # return nn.functional.log_softmax(z, dim=1)
-        return nn.functional.softmax(z, dim=1)
+        if self.single_label:
+            return z
+        return nn.functional.log_softmax(z, dim=1)
 
     def _forward_multiple(self, x: Dict) -> Tensor:
         """Forward pass splitting in different sentences within each sample."""
@@ -90,6 +92,8 @@ class CustomVisualCLIP(nn.Module):
         """
         super(CustomVisualCLIP, self).__init__()
         clip = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
+        # from transformers import CLIPConfig
+        # clip = CLIPModel(CLIPConfig())
         self.base_visual_clip = clip.vision_model
         self.base_visual_proj = clip.visual_projection
         self.output_embed = True if num_classes < 1 else False
@@ -115,8 +119,7 @@ class CustomVisualCLIP(nn.Module):
         if self.output_embed:
             return z
         z = self.classifier(z)
-        # return nn.functional.log_softmax(z, dim=1)
-        return nn.functional.softmax(z, dim=1)
+        return nn.functional.log_softmax(z, dim=1)
 
 
 class CLIP(nn.Module):
