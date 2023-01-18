@@ -40,8 +40,6 @@ class Trainer:
         """ Systematize a typical lifecycle of a machine learning
         pipeline, including training, validating and testing one.
 
-        TODO: Switch to model checkpoint.
-
         Args:
             model: Torch model to work with.
             loss_fn: Error function.

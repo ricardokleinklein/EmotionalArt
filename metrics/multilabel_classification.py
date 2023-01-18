@@ -174,8 +174,7 @@ class DistributionDistanceMetrics(Metrics):
         metrics_['acc@1'] = accuracy_score(y1.squeeze(), y_hat1.squeeze())
 
         y3 = torch.topk(y, k=3, dim=1)[1].detach().cpu().numpy()
-        y_hat3 = torch.topk(y_hat, k=3, dim=1)[1].detach().cpu().numpy()
-        metrics_['hamming@3'] = self.average_hamming(y3, y_hat3)
+        metrics_['hamming@3'] = self.average_hamming(y3, y_hat1)
         return metrics_
 
     @staticmethod

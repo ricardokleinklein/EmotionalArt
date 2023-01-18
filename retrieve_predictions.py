@@ -79,8 +79,6 @@ def main():
     artemis = pandas.read_csv(args.src)
     loss = LOSS[args.loss]
 
-    metrics = DistributionDistanceMetrics()
-
     test_data = artemis[artemis['split'] == "test"]
 
     data_reader = BRANCH_CONFIG[args.branch]['reader']
@@ -106,7 +104,7 @@ def main():
                       device=args.device)
     test_preds, test_loss = trainer.eval(data_loader=test_loader,
                                          use_best=True, verbose=True)
-    numpy.save(Path(args.run) / "test_predictions2", test_preds.cpu().numpy())
+    numpy.save(Path(args.run) / "test_predictions", test_preds.cpu().numpy())
 
 
 if __name__ == "__main__":
