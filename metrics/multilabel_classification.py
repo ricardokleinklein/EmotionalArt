@@ -146,8 +146,6 @@ class DistributionDistanceMetrics(Metrics):
     metrics = {
         'acc@1': {'value': 0,
                   'mode': 'max'},
-        'hamming@3': {'value': 0,
-                    'mode': 'max'},
         'EMD': {'value': 0,
                 'mode': 'min'}
     }
@@ -172,23 +170,4 @@ class DistributionDistanceMetrics(Metrics):
         y1 = torch.topk(y, k=1, dim=1)[1].detach().cpu().numpy()
         y_hat1 = torch.topk(y_hat, k=1, dim=1)[1].detach().cpu().numpy()
         metrics_['acc@1'] = accuracy_score(y1.squeeze(), y_hat1.squeeze())
-
-        #y3 = torch.topk(y, k=3, dim=1)[1].detach().cpu().numpy()
-        #metrics_['hamming@3'] = self.average_hamming(y3, y_hat1)
         return metrics_
-
-    @staticmethod
-    def average_hamming(y: numpy.ndarray, y_hat: numpy.ndarray) -> float:
-        """ Compute the average hamming loss@3 for a series of samples
-        independently.
-
-        Args:
-            y: (N, K) Target labels.
-            y_hat: (N, K) Predicted labels.
-
-        Returns:
-            Average Hamming Loss
-        """
-        return numpy.mean([hamming_loss(i, j) for i, j in zip(y,
-                                                              y_hat)]).item()
-
