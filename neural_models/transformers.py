@@ -110,7 +110,6 @@ class CustomVisualCLIP(nn.Module):
         Returns:
             prediction per video (BS, num_classes)
         """
-        x['pixel_values'] = x['pixel_values'].squeeze()
         z = self.base_visual_clip(**x).pooler_output
         z = self.base_visual_proj(z)
         if self.output_embed:

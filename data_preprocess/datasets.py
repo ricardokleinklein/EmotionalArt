@@ -12,6 +12,7 @@ import transformers
 import torch
 import numpy
 import pandas
+import pathlib
 
 
 # https://stackoverflow.com/questions/51152059/pillow-in-python-wont-let-me
@@ -23,6 +24,21 @@ def multisentence_collate(data):
     target = torch.stack([x[1] for x in data])
     sentence_batch = [x[0] for x in data]
     return sentence_batch, target
+
+
+def normsum(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    """ Add two vectors element-wise and then normalize the output
+
+    Args:
+        a: tensor 1
+        b: tensor 2
+
+    Returns:
+        unit vector of the sum of two vectors
+    """
+    addition = a.add(b)
+    norm = torch.linalg.norm(addition)
+    return addition / norm
 
 
 class SentencesDataset(Dataset):
@@ -293,3 +309,57 @@ class CLIPDataset(Dataset):
         sampler = BalancedBatchSampler(labels, batch_size, 1)
         return DataLoader(dataset=self,  num_workers=num_workers,
                           batch_sampler=sampler)
+
+
+class EmbeddingsDataset(Dataset):
+
+    fusion_op = {'dot': lambda x: x[0].squeeze() * x[1].squeeze(),
+                 'mean': lambda x: x.mean(dim=0),
+                 'concat': lambda x: torch.flatten(x),
+                 'normsum': lambda x: normsum(x[0].squeeze(), x[1].squeeze())}
+
+    def __init__(self, data: pandas.DataFrame,
+                 vector_dir: Union[str, pathlib.Path],
+                 scores: Union[numpy.ndarray, List],
+                 method: str = "dot") -> None:
+        """ Embeddings are supposed to be name by the data dataframe's index,
+        so to item in row n corresponds the embedding `vector_dir / n.npy`.
+
+        Args:
+            data: Dataset to iterate
+            vector_dir: Directory with embeddings named after data indexes
+            scores: Array of ground-truth labels to compare with
+            method: Fusion method [dot | mean | concat | normsum]
+
+        """
+        self.data = data
+        self.targets = scores
+        self.from_dir = pathlib.Path(vector_dir)
+        self.method = self.fusion_op[method]
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx: int) -> Tuple[Dict[str, Any], Any]:
+        idx_ = self.data.index[idx]
+        path = self.from_dir / f"{idx_}.npy"
+        v = torch.tensor(numpy.load(path))
+        v = self.method(v)
+        target = torch.tensor(self.targets[idx]).float()
+        return {'vector': v}, target
+
+    def load(self, phase: str = 'train', batch_size: int = 32,
+             num_workers: int = 0) -> torch.utils.data.DataLoader:
+        """Retrieve a DataLoader to ease the pipeline.
+
+        Args:
+            phase: Whether it's train or test.
+            batch_size: Samples per batch.
+            num_workers: Cores to use.
+
+        Returns:
+            an iterable torch DataLoader.
+        """
+        shuffle = True if phase == "train" else False
+        return DataLoader(dataset=self, batch_size=batch_size,
+                          shuffle=shuffle, num_workers=num_workers)
