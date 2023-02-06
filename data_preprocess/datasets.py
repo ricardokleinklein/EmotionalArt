@@ -314,7 +314,7 @@ class CLIPDataset(Dataset):
 class EmbeddingsDataset(Dataset):
 
     fusion_op = {'dot': lambda x: x[0].squeeze() * x[1].squeeze(),
-                 'mean': lambda x: x.mean(dim=0),
+                 'mean': lambda x: x.mean(dim=0).squeeze(),
                  'concat': lambda x: torch.flatten(x),
                  'normsum': lambda x: normsum(x[0].squeeze(), x[1].squeeze())}
 

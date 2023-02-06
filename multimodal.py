@@ -10,7 +10,7 @@ The learning is always performed over Artemis data.
 
 Positional arguments:
     src                     Artemis dataset file
-    fusion                  Late-fusion method: [dot | concat | cross]
+    fusion                  Late-fusion method: [dot | mean | concat | normsum]
     embeddings_dir          Directory where precomputed embeddings are stored
 
 Optional arguments:
@@ -47,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     # Positional arguments
     parser.add_argument("src", type=str, help="Artemis dataset file")
     parser.add_argument("fusion", type=str,
-                        choices=["dot", "concat", "normsum"],
+                        choices=["dot", "concat", "mean", "normsum"],
                         help="Late-fusion method")
     parser.add_argument("embeddings_dir", type=str,
                         help="Directory where precomputed embeddings are "

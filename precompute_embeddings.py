@@ -8,6 +8,8 @@ carried out exclusively over the last layer, far more efficient.
 
 Positional arguments:
     src                     Dataset file
+
+Optional arguments:
     pretrained              Path to pretrained model's state dict
 
 """
@@ -28,7 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=formatter)
     parser.add_argument("src", type=str, help="Original dataset CSV")
-    parser.add_argument("pretrained", type=str,
+    parser.add_argument("--pretrained", type=str, default=None,
                         help="Path to pretrained weights")
     return parser.parse_args()
 
@@ -44,12 +46,14 @@ def from_pretrained(path_to_pretrained: pathlib.Path) -> Module:
         a CLIP model whose weigths are retrieved from a checkpoint.
     """
     device = "cpu" if not torch.cuda.is_available() else "cuda"
-    pretrained_state_dict = torch.load(path_to_pretrained,
-                                       map_location=torch.device(device))
     full_clip = CLIP()
-    full_clip.load_state_dict(pretrained_state_dict, strict=True)
     full_clip.output_embed = True
     full_clip.textual.multiple = True
+    if path_to_pretrained is None:
+        return full_clip
+    pretrained_state_dict = torch.load(path_to_pretrained,
+                                       map_location=torch.device(device))
+    full_clip.load_state_dict(pretrained_state_dict, strict=True)
     return full_clip
 
 
@@ -65,6 +69,8 @@ def main():
                                     image_paths=dataset['localpath'].values,
                                     scores=[0.0] * len(dataset),
                                     processor=None)
+    if args.pretrained is None:
+        args.pretrained = "./fake-parent-dir"
     vector_dir = pathlib.Path(args.pretrained).parent / "precomputed"
     vector_dir.mkdir(exist_ok=True, parents=False)
     for i, x in enumerate(tqdm(data_reader)):
