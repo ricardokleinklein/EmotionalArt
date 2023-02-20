@@ -41,9 +41,7 @@ BRANCH_CONFIG = {'text': {'reader': SentencesDataset,
                           'processor': BPETokenizer('clip', seq_len=77)},
                  'vision': {'reader': ImageDataset,
                             'feat_col': 'localpath',
-                            'processor': None},
-                 'late': None,
-                 'align': None}
+                            'processor': None}}
 
 
 LOSS = {'kldiv': KLDivLoss(reduction='batchmean'),
@@ -132,13 +130,15 @@ def main():
                        scores=tonumpy(test_data['emotion']),
                        processor=processor)
     test_loader = test.load(phase="test", batch_size=args.batch)
-    val_loader = test_loader if args.val else None
+#    val_loader = test_loader if args.val else None
+    val_loader = test_loader
 
     nb_emotions = len(artemis['emotion_label'].unique())
     logger(f"\n\tNb categories: {nb_emotions}")
     model_opts = {'text': CustomTextualCLIP(num_classes=nb_emotions,
                                             finetune=args.finetune,
-                                            multisentence=True),
+                                            multisentence=True,
+                                            scratch=True),
                   'vision': CustomVisualCLIP(num_classes=nb_emotions,
                                              finetune=args.finetune)}
     trainer = Trainer(model=model_opts[args.branch], loss_fn=loss,
@@ -148,11 +148,11 @@ def main():
     trainer.fit(data_loader=train_loader, val_loader=val_loader,
                 max_epochs=args.epochs, patience=args.patience,
                 tol_eps=args.eps)
-    test_preds, test_loss = trainer.eval(data_loader=test_loader,
-                                         use_best=True, verbose=True)
-    test_metrics = trainer.assess(data_loader=test_loader,
-                                  predictions=test_preds)
-    logger(f"Loss: {test_loss}\nMetrics:{test_metrics}")
+#    test_preds, test_loss = trainer.eval(data_loader=test_loader,
+#                                         use_best=True, verbose=True)
+#    test_metrics = trainer.assess(data_loader=test_loader,
+#                                  predictions=test_preds)
+#    logger(f"Loss: {test_loss}\nMetrics:{test_metrics}")
 
     if args.save:
         logger("Saving model's state dict in disk.")

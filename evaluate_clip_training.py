@@ -76,6 +76,7 @@ def custom_model(data: torch.utils.data.Dataset,
     model.load_state_dict(torch.load(checkpoint, map_location=device),
                           strict=True)
     model.eval()
+    model.to(device)
 
     sentences = []
     visual_embeddings = []
@@ -152,7 +153,9 @@ def main():
     checkpoint = Path(args.run) / "model_state_dict.pt"
 
     dataset = pandas.read_csv(args.src)
-    dataset = dataset[dataset['split'] == "test"]
+    third = len(dataset) // 3
+    dataset = dataset.iloc[:third]
+    dataset = dataset[dataset['split'] == "val"]
     data = CLIPDataset(data=dataset, text_col=col, image_col="localpath")
     dataloader = data.load(batch_size=args.batch)
 

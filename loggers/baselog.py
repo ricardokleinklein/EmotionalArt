@@ -72,7 +72,7 @@ class Logger(logging.Logger):
         self.logger.info(msg=msg)
 
     def close(self) -> None:
-        self.logger.info("Closing logger.")
+        self.logger.info(f"Closing {self.log_dir} logger.")
         handlers = self.logger.handlers[:]
         for handler in handlers:
             self.logger.removeHandler(handler)

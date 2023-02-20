@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
                         help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-5,
                         help="Initial learning rate")
-    parser.add_argument("--eps", type=float, default=0.05,
+    parser.add_argument("--eps", type=float, default=0.01,
                         help="Minimum improvement required during training")
     parser.add_argument("--log_dir", type=str, default=None,
                         help="Name for the experiment")
@@ -88,10 +88,10 @@ def main():
     logger(f"\n\tNb train samples: {len(train_data)}\n\tNb eval samples: "
            f"{len(test_data)}")
 
-    train = CLIPDataset(train_data, text_col="description",
+    train = CLIPDataset(train_data, text_col="utterance",
                         image_col="localpath")
     train_loader = train.load("train", batch_size=args.batch)
-    test = CLIPDataset(test_data, text_col="description",
+    test = CLIPDataset(test_data, text_col="utterance",
                        image_col="localpath")
     test_loader = test.load("test", batch_size=args.batch)
     model = CLIP()

@@ -98,7 +98,7 @@ def pick_cc(x: pandas.Series, cols: List[str]) -> str:
 
 def main():
     args = parse_args()
-    dataset = pandas.read_json(args.src).transpose()[:100]
+    dataset = pandas.read_json(args.src).transpose()
     dataset['title'] = dataset['title'].apply(lambda s: unidecode(s).lower())
 
     # Download images if not present, or force downloading again if flag

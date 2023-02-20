@@ -19,7 +19,7 @@ Optional arguments:
     --log-dir               Experiment dirname to label logs under
     -s, --save              Whether to save trained models afterwards
     --seed                  Random seed value
-    -- device               Device to use. Default: cuda
+    --device               Device to use. Default: cuda
 """
 import argparse
 import numpy
@@ -70,7 +70,7 @@ def parse_args() -> argparse.Namespace:
                         help="Initial learning rate")
     parser.add_argument("--loss", type=str, default='kldiv',
                         choices=['kldiv', 'emd'], help="Loss function")
-    parser.add_argument("--eps", type=float, default=0.05,
+    parser.add_argument("--eps", type=float, default=0.01,
                         help="Minimum improvement required during training")
     parser.add_argument("--log_dir", type=str, default=None,
                         help="Name for the experiment")
@@ -125,13 +125,13 @@ def from_pretrained(path_to_pretrained: pathlib.Path,
 
     # freeze all layers but final classifier
     proj_layer = "base_{}_clip".format(
-        "visual" if branch == "vision" else "text"
+       "visual" if branch == "vision" else "text"
     )
-    frozen_layers = [l for l in [getattr(branch_only, prev_layer), getattr(
-        branch_only, proj_layer)]]
-    for layer in frozen_layers:
-        for param in layer.parameters():
-            param.requires_grad = False
+#    frozen_layers = [l for l in [getattr(branch_only, prev_layer), getattr(
+#       branch_only, proj_layer)]]
+#    for layer in frozen_layers:
+#       for param in layer.parameters():
+#           param.requires_grad = False
     branch_only.output_embed = False
     if branch != "vision":
         branch_only.multiple = True # 1+ sentence per sample

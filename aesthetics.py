@@ -21,6 +21,7 @@ Optional arguments:
     --device               Device to use. Default: cuda
 """
 import argparse
+import logging
 import pandas
 import pathlib
 
@@ -32,6 +33,9 @@ from neural_models.transformers import *
 from metrics.regression_metrics import RegressionMetrics
 from workflow.trainer import Trainer
 from loggers.baselog import Logger
+
+# https://github.com/camptocamp/pytest-odoo/issues/15
+logging.getLogger('PIL').setLevel(logging.WARNING)
 
 
 def parse_args() -> argparse.Namespace:
@@ -79,22 +83,23 @@ def retrieve_pretrained_vision(path_to_pretrained: pathlib.Path,
         a branch of a CLIP model whose weigths are retrieved from a
         checkpoint but for the final layer.
     """
-    # read pretrained state dict
-    pretrained_state_dict = torch.load(path_to_pretrained,
-                                       map_location=torch.device(device))
     full_clip = CLIP()
-    full_clip.load_state_dict(pretrained_state_dict, strict=True)
+    if path_to_pretrained is not None:
+        # read pretrained state dict
+        pretrained_state_dict = torch.load(path_to_pretrained,
+                                           map_location=torch.device(device))
+        full_clip.load_state_dict(pretrained_state_dict, strict=True)
     model = full_clip.__getattr__("vision")
 
     # replace last layer (classifier)
     model.classifier = nn.Linear(
-        in_features=getattr(model, "base_vision_proj").out_features,
+        in_features=getattr(model, "base_visual_proj").out_features,
         out_features=num_classes
     )
 
     # freeze all layers but final classifier
-    frozen_layers = [l for l in [getattr(model, "base_vision_proj"), getattr(
-        model, "base_vision_clip")]]
+    frozen_layers = [l for l in [getattr(model, "base_visual_proj"), getattr(
+        model, "base_visual_clip")]]
     for layer in frozen_layers:
         for param in layer.parameters():
             param.requires_grad = False
@@ -106,7 +111,6 @@ def main():
     args = parse_args()
     wikiart = pandas.read_csv(args.src)
     metrics = RegressionMetrics()
-    print(list(wikiart))
 
     logger = Logger(log_dir=args.log_dir)
     logger(f"Experiment configuration:\n"

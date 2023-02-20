@@ -8,7 +8,8 @@ class squeezing of predictions and labels has been removed.
 import torch
 import torch.nn as nn
 
-from transformers import CLIPModel
+from transformers import CLIPConfig
+from transformers import CLIPModel, BertModel, ViTModel
 from transformers import PreTrainedTokenizer
 from typing import Dict, Tuple, Any
 
@@ -16,12 +17,12 @@ Tensor = torch.Tensor
 Tokenizer = PreTrainedTokenizer
 
 
-class CustomTextualCLIP(nn.Module):
+class BERT(nn.Module):
 
     def __init__(self, num_classes: int, finetune: bool = False,
                  multisentence: bool = False):
         """
-        Visual half of a CLIP model ready to fine-tune on classification
+        BERT model ready to fine-tune on classification
         and/or regression tasks.
 
         Args:
@@ -30,8 +31,55 @@ class CustomTextualCLIP(nn.Module):
             the whole model.
 
         """
+        super(BERT, self).__init__()
+        self.bert = BertModel.from_pretrained("bert-base-uncased")
+        self.multiple = multisentence
+        self.output_embed = True if num_classes < 1 else False
+        if finetune:
+            for param in self.bert.parameters():
+                param.requires_grad = False
+        self.classifier = nn.Linear(self.bert.config.hidden_size, num_classes)
+
+    def forward(self, x: Dict) -> Tensor:
+        if self.multiple:
+            z = self._forward_multiple(x)
+        else:
+            z = self._simple(x)
+        if self.output_embed:
+            return z
+        z = self.classifier(z)
+        return nn.functional.log_softmax(z, dim=1)
+
+    def _forward_multiple(self, x: Dict) -> Tensor:
+        """Forward pass splitting in different sentences within each sample."""
+        z = [torch.mean(self._simple(x_i), dim=0) for x_i in x]
+        return torch.stack(z)
+
+    def _simple(self, x: Dict) -> Tensor:
+        return self.bert(**x).pooler_output
+
+
+class CustomTextualCLIP(nn.Module):
+
+    def __init__(self, num_classes: int, finetune: bool = False,
+                 multisentence: bool = False, scratch: bool = False):
+        """
+        Visual half of a CLIP model ready to fine-tune on classification
+        and/or regression tasks.
+
+        Args:
+            num_classes: Labels to predict.
+            finetune: If True, adjust only the last layer, otherwise train
+            the whole model.
+            multisentence:
+            scratch: Whether to load the configuration but not the weights
+
+        """
         super(CustomTextualCLIP, self).__init__()
-        clip = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
+        config = CLIPConfig()
+        clip = CLIPModel(config)
+        if not scratch:
+            clip = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
         self.multiple = multisentence
         self.base_text_clip = clip.text_model
         self.base_text_proj = clip.text_projection
@@ -89,8 +137,6 @@ class CustomVisualCLIP(nn.Module):
         """
         super(CustomVisualCLIP, self).__init__()
         clip = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
-        # from transformers import CLIPConfig
-        # clip = CLIPModel(CLIPConfig())
         self.base_visual_clip = clip.vision_model
         self.base_visual_proj = clip.visual_projection
         self.output_embed = True if num_classes < 1 else False
@@ -112,6 +158,43 @@ class CustomVisualCLIP(nn.Module):
         """
         z = self.base_visual_clip(**x).pooler_output
         z = self.base_visual_proj(z)
+        if self.output_embed:
+            return z
+        z = self.classifier(z)
+        return nn.functional.log_softmax(z, dim=1)
+
+
+class VIT(nn.Module):
+
+    def __init__(self, num_classes: int, finetune: bool = False):
+        """
+        ViT model ready to fine-tune on classification
+        and/or regression tasks.
+
+        Args:
+            num_classes: Labels to predict.
+            finetune: If True, adjust only the last layer, otherwise train
+            the whole model.
+
+        """
+        super(VIT, self).__init__()
+        self.vit = ViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
+        self.output_embed = True if num_classes < 1 else False
+        if finetune:
+            for param in self.vit.parameters():
+                param.requires_grad = False
+        self.classifier = nn.Linear(self.vit.config.hidden_size, num_classes)
+
+    def forward(self, x: Dict) -> Tensor:
+        """ Pass forward.
+
+        Args:
+            x: Dictionary of pixel values with shape (BS, F, C, H, W).
+
+        Returns:
+            prediction per video (BS, num_classes)
+        """
+        z = self.vit(**x).pooler_output
         if self.output_embed:
             return z
         z = self.classifier(z)
