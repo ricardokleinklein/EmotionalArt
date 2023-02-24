@@ -76,6 +76,8 @@ def parse_args() -> argparse.Namespace:
                         help="Name for the experiment")
     parser.add_argument("-s", "--save", action="store_true",
                         help="Save models after training")
+    parser.add_argument("--export", action="store_true",
+                        help="Export test predictions to file")
     parser.add_argument("--seed", type=int, default=1234, help="Random seed")
     parser.add_argument("--device", type=str, default="cuda",
                         help="Device on which to run the experiment")
@@ -127,11 +129,11 @@ def from_pretrained(path_to_pretrained: pathlib.Path,
     proj_layer = "base_{}_clip".format(
        "visual" if branch == "vision" else "text"
     )
-#    frozen_layers = [l for l in [getattr(branch_only, prev_layer), getattr(
-#       branch_only, proj_layer)]]
-#    for layer in frozen_layers:
-#       for param in layer.parameters():
-#           param.requires_grad = False
+    frozen_layers = [l for l in [getattr(branch_only, prev_layer), getattr(
+        branch_only, proj_layer)]]
+    for layer in frozen_layers:
+        for param in layer.parameters():
+            param.requires_grad = False
     branch_only.output_embed = False
     if branch != "vision":
         branch_only.multiple = True # 1+ sentence per sample
@@ -195,6 +197,10 @@ def main():
     if args.save:
         logger("Saving model's state dict in disk.")
         trainer.save(logger.log_dir / "model_state_dict.pt", use_best=True)
+    if args.export:
+        logger("Exporting model's test predictions to file.")
+        numpy.save(logger.log_dir / "test_predictions",
+                   test_preds.cpu().numpy())
     logger.close()
 
 

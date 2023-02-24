@@ -130,15 +130,14 @@ def main():
                        scores=tonumpy(test_data['emotion']),
                        processor=processor)
     test_loader = test.load(phase="test", batch_size=args.batch)
-#    val_loader = test_loader if args.val else None
-    val_loader = test_loader
+    val_loader = test_loader if args.val else None
 
     nb_emotions = len(artemis['emotion_label'].unique())
     logger(f"\n\tNb categories: {nb_emotions}")
     model_opts = {'text': CustomTextualCLIP(num_classes=nb_emotions,
                                             finetune=args.finetune,
                                             multisentence=True,
-                                            scratch=True),
+                                            scratch=False),
                   'vision': CustomVisualCLIP(num_classes=nb_emotions,
                                              finetune=args.finetune)}
     trainer = Trainer(model=model_opts[args.branch], loss_fn=loss,
@@ -148,11 +147,11 @@ def main():
     trainer.fit(data_loader=train_loader, val_loader=val_loader,
                 max_epochs=args.epochs, patience=args.patience,
                 tol_eps=args.eps)
-#    test_preds, test_loss = trainer.eval(data_loader=test_loader,
-#                                         use_best=True, verbose=True)
-#    test_metrics = trainer.assess(data_loader=test_loader,
-#                                  predictions=test_preds)
-#    logger(f"Loss: {test_loss}\nMetrics:{test_metrics}")
+    test_preds, test_loss = trainer.eval(data_loader=test_loader,
+                                        use_best=True, verbose=True)
+    test_metrics = trainer.assess(data_loader=test_loader,
+                                 predictions=test_preds)
+    logger(f"Loss: {test_loss}\nMetrics:{test_metrics}")
 
     if args.save:
         logger("Saving model's state dict in disk.")

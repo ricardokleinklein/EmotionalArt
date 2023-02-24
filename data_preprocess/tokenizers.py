@@ -28,6 +28,7 @@ class BPETokenizer:
             self.TOKENIZERS[name_or_path][1]
         )
         self.tokenizer.add_prefix_space = True
+        self.tokenizer.use_cache = False
         if seq_len is not None:
             self.tokenizer.model_max_length = seq_len
         if self.tokenizer.pad_token_id is None:
